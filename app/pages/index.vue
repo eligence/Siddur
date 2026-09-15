@@ -317,9 +317,14 @@ function handleSelect(ref: string) {
   position: relative;
 }
 .hebrew-line {
+  /* Fixed column count per breakpoint; consumed by .word-cell in HebrewWord.vue
+     to size every cell identically. Default covers ≤1023px (425px tier). */
+  --cols: 5;
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  /* stretch (not flex-end) so every .word-cell in a row gets equal height —
+     .word-he then grows to fill its cell and the .word-input row stays aligned. */
+  align-items: stretch;
   gap: 0 0.2rem;
   margin: 0 0 0.5rem;
   direction: rtl;
@@ -330,6 +335,21 @@ function handleSelect(ref: string) {
      positioned outside its paragraph's box and must stay visible. */
   content-visibility: auto;
   contain-intrinsic-size: auto 5rem;
+}
+@media (min-width: 1024px) {
+  .hebrew-line {
+    --cols: 8;
+  }
+}
+@media (min-width: 1440px) {
+  .hebrew-line {
+    --cols: 12;
+  }
+}
+@media (min-width: 2560px) {
+  .hebrew-line {
+    --cols: 18;
+  }
 }
 .note-text {
   flex-basis: 100%;

@@ -69,7 +69,9 @@ function onInputTab(e: KeyboardEvent) {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  flex: 1 1 3.5rem;
+  /* Fixed-width column: exactly --cols cells fill a row. The extra +0.2rem
+     compensates for the row gap on .hebrew-line so widths come out exact. */
+  flex: 0 0 calc((100% + 0.2rem) / var(--cols, 5) - 0.2rem);
   margin-bottom: 0.6rem;
 }
 .word-input {
@@ -96,8 +98,13 @@ function onInputTab(e: KeyboardEvent) {
   line-height: 1.7;
   padding: 0;
   color: inherit;
-  text-align: center;
   border-radius: 4px;
+  /* Grow to fill the cell's stretched height so all .word-he in a row are
+     equal height; the word itself stays top-centered. */
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
 }
 .word-he:hover {
   background: #f0f4ff;
