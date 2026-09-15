@@ -1,4 +1,4 @@
-import type { SectionParagraph, SectionText, TocNode } from '../../shared/types/siddur'
+import type { HebrewSegment, SectionParagraph, SectionText, TocNode } from '../../shared/types/siddur'
 
 const SEFARIA_BASE = 'https://www.sefaria.org'
 
@@ -52,6 +52,32 @@ export function buildToc(node: SefariaSchemaNode, parentKeys: string[] = []): To
   }
 }
 
+/** Split a paragraph's raw Hebrew HTML into non-interactive "note" (<small>) segments and tokenized "words" segments. */
+export function parseHebrewSegments(html: string): HebrewSegment[] {
+  const segments: HebrewSegment[] = []
+  const smallRegex = /<small>([\s\S]*?)<\/small>/g
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  const pushWords = (chunk: string) => {
+    const text = chunk
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .trim()
+    const words = text.split(/\s+/).filter(Boolean)
+    if (words.length) segments.push({ type: 'words', words })
+  }
+
+  while ((match = smallRegex.exec(html))) {
+    if (match.index > lastIndex) pushWords(html.slice(lastIndex, match.index))
+    segments.push({ type: 'note', html: (match[1] ?? '').trim() })
+    lastIndex = smallRegex.lastIndex
+  }
+  if (lastIndex < html.length) pushWords(html.slice(lastIndex))
+
+  return segments
+}
+
 interface SefariaVersionEntry {
   language: string
   versionTitle: string
@@ -83,14 +109,17 @@ export async function fetchSefariaText(ref: string): Promise<SectionText> {
   const heLines = heVersion?.text ?? []
   const enLines = enVersion?.text ?? []
 
+  const stripTags = (value: string) => value.replace(/<[^>]+>/g, '').trim()
+
   let hasTranslation = false
   const paragraphs: SectionParagraph[] = heLines.map((he, i) => {
     const rawEn = enLines[i]
-    // The community translation sometimes leaves an entry blank or duplicates
-    // the Hebrew source when untranslated; treat those cases as "no translation".
-    const en = rawEn && rawEn.trim() && rawEn.trim() !== he.trim() ? rawEn : null
+    // The community translation sometimes leaves an entry blank or duplicates the Hebrew
+    // source (often missing the Hebrew's <b>/<small> markup) when untranslated; compare
+    // tag-stripped text so those duplicates are still treated as "no translation".
+    const en = rawEn && stripTags(rawEn) && stripTags(rawEn) !== stripTags(he) ? rawEn : null
     if (en) hasTranslation = true
-    return { he, en }
+    return { he, en, segments: parseHebrewSegments(he) }
   })
 
   const result: SectionText = {

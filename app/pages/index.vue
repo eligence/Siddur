@@ -6,6 +6,15 @@ const { sections, loading, errors, loadSection } = useSiddurSections()
 
 const openKeys = ref<Record<string, boolean>>({})
 const activeRef = ref<string | null>(null)
+const revealed = ref<Record<string, boolean>>({})
+
+function paragraphId(ref: string, index: number) {
+  return `${ref}::${index}`
+}
+
+function wordId(ref: string, paraIndex: number, segIndex: number, wordIndex: number) {
+  return `${ref}::${paraIndex}::${segIndex}::${wordIndex}`
+}
 
 /** Flatten the TOC tree into an ordered list of leaf (ref, title) entries. */
 function flattenLeaves(nodes: TocNode[]): TocNode[] {
@@ -31,13 +40,18 @@ async function loadAllSections(refs: string[], concurrency = 5) {
   await Promise.all(Array.from({ length: concurrency }, worker))
 }
 
-watch(
-  leaves,
-  (list) => {
-    if (list.length) loadAllSections(list.map((l) => l.ref!))
-  },
-  { immediate: true },
-)
+// Section text is fetched on-demand rather than via useFetch/useAsyncData, so its
+// timing relative to SSR render is non-deterministic. Only trigger it client-side to
+// avoid hydration mismatches between the SSR HTML and the client's initial render.
+if (import.meta.client) {
+  watch(
+    leaves,
+    (list) => {
+      if (list.length) loadAllSections(list.map((l) => l.ref!))
+    },
+    { immediate: true },
+  )
+}
 
 function sectionElementId(ref: string) {
   return `section-${ref.replace(/[^a-zA-Z0-9]+/g, '-')}`
@@ -91,10 +105,33 @@ function handleSelect(ref: string) {
             :key="i"
             class="paragraph"
           >
-            <p class="hebrew" dir="rtl" v-html="para.he" />
-            <p v-if="para.en" class="english" v-html="para.en" />
+            <div class="hebrew-line">
+              <template v-for="(seg, si) in para.segments" :key="si">
+                <span v-if="para.en && revealed[paragraphId(leaf.ref!, i)]" class="english" v-html="para.en" />
+                <span v-if="seg.type === 'note'" class="note-text hebrew-line" dir="rtl" v-html="seg.html" />
+                <template v-else>
+                  <HebrewWord
+                    v-for="(word, wi) in seg.words"
+                    :key="wi"
+                    :id="wordId(leaf.ref!, i, si, wi)"
+                    :word="word"
+                  />
+                </template>
+              </template>
+            </div>
+
+            <button
+              v-if="para.en"
+              type="button"
+              class="reveal-toggle"
+              @click="revealed[paragraphId(leaf.ref!, i)] = !revealed[paragraphId(leaf.ref!, i)]"
+            >
+              {{ revealed[paragraphId(leaf.ref!, i)] ? 'Hide translation' : 'Show translation' }}
+            </button>
           </div>
         </template>
+
+        <p v-else class="status">Not loaded yet…</p>
       </section>
     </main>
   </div>
@@ -156,14 +193,40 @@ function handleSelect(ref: string) {
 }
 .paragraph {
   margin-bottom: 1.25rem;
+  text-align: right;
 }
-.hebrew {
-  font-size: 1.3rem;
-  line-height: 1.9;
-  margin: 0 0 0.35rem;
+.hebrew-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin: 0 0 0.5rem;
+  text-align: right;
+}
+.note-text {
+  font-size: 0.85rem;
+  color: #888;
+  font-style: italic;
+  line-height: 1.6;
+  margin: 0.3rem 0;
+  flex-basis: 100%;
+}
+.reveal-toggle {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.7rem;
+  cursor: pointer;
+  color: #555;
+}
+.reveal-toggle:hover {
+  background: #f0f4ff;
 }
 .english {
+  display: block;
+  flex-basis: 100%;
   color: #333;
-  margin: 0;
+  margin: 0.5rem 0 0;
+  text-align: right;
 }
 </style>

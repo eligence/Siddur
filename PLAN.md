@@ -34,12 +34,29 @@ Goal: fetch the full `Weekday Siddur Chabad` text and arrange it on a single pag
 
 ---
 
-## Phase 2 — Word-Level Learning (later)
+## Phase 2 — Word-Level Learning (in progress)
 
-- Add visual spacing between Hebrew lines/words (word-tokenized rendering instead of raw HTML blocks).
-- For each Hebrew word, render an adjacent text input where the user types their guess at the English translation.
-- Clicking a Hebrew word fetches its definition/translation from Sefaria's **Lexicon** endpoint (`/api/words/{word}`) to let the user check their answer against a real gloss.
-- Persist user-entered translations locally (e.g. `localStorage` or a small server-side store) so progress isn't lost between sessions.
+Goal: tokenize the learnable Hebrew text into words, put an input above each word for the user's translation guess, and let them check it by clicking the word (fetched from Sefaria's Lexicon).
+
+### Key rule
+Text wrapped in `<small>...</small>` in Sefaria's Hebrew source is **instructional/halachic commentary**, not prayer text — it is excluded from word-input/translation-check features and rendered as plain non-interactive italic notes.
+
+### Build steps (done)
+1. `shared/types/siddur.ts` — added `HebrewSegment` (`{ type: 'note', html }` | `{ type: 'words', words }`) and `LexiconResult`; `SectionParagraph` now carries `segments`.
+2. `server/utils/sefaria.ts` — `parseHebrewSegments()` splits each paragraph's raw Hebrew HTML on `<small>` boundaries, tokenizing the remaining (learnable) text into words by whitespace.
+3. `server/utils/lexicon.ts` + `server/api/words/[word].get.ts` — proxy/cache Sefaria's `GET /api/words/{word}` Lexicon endpoint, simplified to `{ headword, lexicon, definitions[] }[]`, prioritizing concise dictionaries (Klein, Jastrow) over verbose biblical ones (BDB).
+4. `app/composables/useWordProgress.ts` — reactive, `localStorage`-backed map of the user's typed guesses, keyed by `ref::paragraphIndex::segmentIndex::wordIndex` (persists across reloads).
+5. `app/composables/useLexicon.ts` — client-side cache + `lookup(word)` calling `/api/words/:word`; strips leading/trailing punctuation before lookup, keeps niqqud.
+6. `app/components/HebrewWord.vue` — renders one word cell: text input **above** the Hebrew word, click-to-toggle popover showing lexicon definitions below.
+7. `app/pages/index.vue` — paragraphs now render `segments`: `note` segments as italic non-interactive text, `words` segments as a wrapped row of `HebrewWord` cells. Full paragraph-level English translation is hidden by default behind a "Show translation" toggle (so the per-word exercise isn't spoiled immediately).
+
+### Verified
+- `GET /api/siddur/text?ref=...` returns `segments` correctly splitting notes vs. learnable words (confirmed via curl on `Upon Arising` and `Morning Blessings`).
+- `GET /api/words/{word}` returns simplified, prioritized lexicon glosses (confirmed via curl on ברוך).
+- Dev server rebuilds cleanly with no errors after adding these files (stale filesystem route/data cache under `.nuxt/cache` was cleared after the schema change — worth remembering during iteration).
+
+### Not yet verified
+- Actual browser interaction (typing in inputs, clicking words, popover positioning, localStorage persistence) — needs manual check in-browser since curl can't execute client JS.
 
 ## Phase 3 — Test Suite (later)
 

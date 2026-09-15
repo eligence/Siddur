@@ -4,6 +4,9 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   routeRules: {
     '/': { prerender: true },
-    '/api/siddur/**': { cache: { maxAge: 60 * 60 * 24 } },
+    // Sefaria data is already cached (and invalidatable) via useStorage in
+    // server/utils/sefaria.ts. Avoid a route-level HTTP cache here since it sets
+    // Cache-Control on the response, which the *browser* also honors — masking
+    // any server-side data/logic fixes behind a stale client-side cache.
   },
 })
