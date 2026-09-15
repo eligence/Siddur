@@ -106,9 +106,9 @@ function handleSelect(ref: string) {
             class="paragraph"
           >
             <div class="hebrew-line">
+              <span v-if="para.en && revealed[paragraphId(leaf.ref!, i)]" class="english" v-html="para.en" />
               <template v-for="(seg, si) in para.segments" :key="si">
-                <span v-if="para.en && revealed[paragraphId(leaf.ref!, i)]" class="english" v-html="para.en" />
-                <span v-if="seg.type === 'note'" class="note-text hebrew-line" dir="rtl" v-html="seg.html" />
+                <span v-if="seg.type === 'note'" class="note-text" dir="rtl" v-html="seg.html" />
                 <template v-else>
                   <HebrewWord
                     v-for="(word, wi) in seg.words"
@@ -158,12 +158,17 @@ function handleSelect(ref: string) {
 }
 .content {
   flex: 1;
+  min-width: 0;
   padding: 1.5rem 2rem;
-  max-width: 900px;
 }
 .prayer-section {
   margin-bottom: 3rem;
   scroll-margin-top: 1rem;
+  /* The whole siddur (dozens of sections, thousands of words) is rendered at once.
+     Skipping layout/paint for off-screen sections keeps resize/scroll reflow cheap
+     and avoids visible lag in the per-row word wrapping while dragging the window. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
 }
 .prayer-section h2 {
   display: flex;
@@ -199,16 +204,17 @@ function handleSelect(ref: string) {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
+  gap: 0 0.2rem;
   margin: 0 0 0.5rem;
-  text-align: right;
+  direction: rtl;
 }
 .note-text {
+  flex-basis: 100%;
   font-size: 0.85rem;
   color: #888;
   font-style: italic;
   line-height: 1.6;
   margin: 0.3rem 0;
-  flex-basis: 100%;
 }
 .reveal-toggle {
   background: none;

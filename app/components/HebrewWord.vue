@@ -55,10 +55,11 @@ function checkWord() {
 <style scoped>
 .word-cell {
   position: relative;
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   align-items: stretch;
-  margin: 0 0.15rem 0.6rem;
+  flex: 1 1 3.5rem;
+  margin-bottom: 0.6rem;
 }
 .word-input {
   width: 100%;
