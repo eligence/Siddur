@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TocNode } from '../../shared/types/siddur'
+import type { SectionParagraph, TocNode } from '../../shared/types/siddur'
 
 const { data: toc, pending: tocPending, error: tocError } = await useSiddurToc()
 const { sections, loading, errors, loadSection } = useSiddurSections()
@@ -7,6 +7,8 @@ const { sections, loading, errors, loadSection } = useSiddurSections()
 const openKeys = ref<Record<string, boolean>>({})
 const activeRef = ref<string | null>(null)
 const revealed = ref<Record<string, boolean>>({})
+// Word inputs start hidden; the ✎ toggle reveals them per paragraph.
+const inputsShown = ref<Record<string, boolean>>({})
 const sidebarOpen = ref(false)
 
 function paragraphId(ref: string, index: number) {
@@ -15,6 +17,10 @@ function paragraphId(ref: string, index: number) {
 
 function wordId(ref: string, paraIndex: number, segIndex: number, wordIndex: number) {
   return `${ref}::${paraIndex}::${segIndex}::${wordIndex}`
+}
+
+function paragraphHasWords(para: SectionParagraph) {
+  return para.segments.some((s) => s.type === 'words' && s.words.length > 0)
 }
 
 /** Flatten the TOC tree into an ordered list of leaf (ref, title) entries. */
@@ -122,7 +128,34 @@ function handleSelect(ref: string) {
             :key="i"
             class="paragraph"
           >
-            <div class="hebrew-line">
+            <div class="paragraph-tools">
+              <button
+                v-if="para.en"
+                type="button"
+                class="reveal-toggle"
+                :class="{ active: revealed[paragraphId(leaf.ref!, i)] }"
+                :aria-pressed="revealed[paragraphId(leaf.ref!, i)]"
+                :aria-label="revealed[paragraphId(leaf.ref!, i)] ? 'Hide translation' : 'Show translation'"
+                :title="revealed[paragraphId(leaf.ref!, i)] ? 'Hide translation' : 'Show translation'"
+                @click="revealed[paragraphId(leaf.ref!, i)] = !revealed[paragraphId(leaf.ref!, i)]"
+              >
+                👁
+              </button>
+              <button
+                v-if="paragraphHasWords(para)"
+                type="button"
+                class="inputs-toggle"
+                :class="{ active: inputsShown[paragraphId(leaf.ref!, i)] }"
+                :aria-pressed="inputsShown[paragraphId(leaf.ref!, i)]"
+                :aria-label="inputsShown[paragraphId(leaf.ref!, i)] ? 'Hide input fields' : 'Show input fields'"
+                :title="inputsShown[paragraphId(leaf.ref!, i)] ? 'Hide input fields' : 'Show input fields'"
+                @click="inputsShown[paragraphId(leaf.ref!, i)] = !inputsShown[paragraphId(leaf.ref!, i)]"
+              >
+                ✎
+              </button>
+            </div>
+
+            <div class="hebrew-line" :class="{ 'inputs-hidden': !inputsShown[paragraphId(leaf.ref!, i)] }">
               <span v-if="para.en && revealed[paragraphId(leaf.ref!, i)]" class="english" v-html="para.en" />
               <template v-for="(seg, si) in para.segments" :key="si">
                 <span v-if="seg.type === 'note'" class="note-text" dir="rtl" v-html="seg.html" />
@@ -136,15 +169,6 @@ function handleSelect(ref: string) {
                 </template>
               </template>
             </div>
-
-            <button
-              v-if="para.en"
-              type="button"
-              class="reveal-toggle"
-              @click="revealed[paragraphId(leaf.ref!, i)] = !revealed[paragraphId(leaf.ref!, i)]"
-            >
-              {{ revealed[paragraphId(leaf.ref!, i)] ? 'Hide translation' : 'Show translation' }}
-            </button>
           </div>
         </template>
 
@@ -197,35 +221,34 @@ function handleSelect(ref: string) {
     transition: opacity 0.25s ease;
   }
 
-  /* On mobile the sidebar itself is the toggle: collapsed it's a small pill in the
-     corner containing just the icon + label; clicking it grows the same element,
-     both horizontally and vertically, into the full off-canvas TOC panel. */
+  /* On mobile the sidebar itself is the toggle: collapsed it's a small tab flush
+     in the page corner containing just the icon + label; clicking it grows the
+     same element, both horizontally and vertically, into the full off-canvas TOC
+     panel. The upper-left corner never moves — only size and the rounded
+     bottom-right corner animate. */
   .sidebar {
     position: fixed;
-    top: 0.75rem;
-    inset-inline-start: 0.75rem;
+    top: 0;
+    inset-inline-start: 0;
     width: 8.5rem;
     height: 2.75rem;
     padding: 0;
     border-inline-end: none;
-    border-radius: 999px;
+    border-radius: 0;
+    border-end-end-radius: 1.25rem;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     overflow: hidden;
     z-index: 50;
     transition:
       width 0.28s ease,
       height 0.28s ease,
-      top 0.28s ease,
-      inset-inline-start 0.28s ease,
-      border-radius 0.28s ease;
+      border-end-end-radius 0.28s ease;
   }
   .sidebar.sidebar-open {
-    top: 0;
-    inset-inline-start: 0;
     width: 80vw;
     max-width: 320px;
     height: 100vh;
-    border-radius: 0;
+    border-end-end-radius: 0;
   }
 
   .sidebar-toggle {
@@ -259,11 +282,6 @@ function handleSelect(ref: string) {
 .prayer-section {
   margin-bottom: 3rem;
   scroll-margin-top: 1rem;
-  /* The whole siddur (dozens of sections, thousands of words) is rendered at once.
-     Skipping layout/paint for off-screen sections keeps resize/scroll reflow cheap
-     and avoids visible lag in the per-row word wrapping while dragging the window. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 600px;
 }
 .prayer-section h2 {
   display: flex;
@@ -294,6 +312,7 @@ function handleSelect(ref: string) {
 .paragraph {
   margin-bottom: 1.25rem;
   text-align: right;
+  position: relative;
 }
 .hebrew-line {
   display: flex;
@@ -302,6 +321,13 @@ function handleSelect(ref: string) {
   gap: 0 0.2rem;
   margin: 0 0 0.5rem;
   direction: rtl;
+  /* The whole siddur (dozens of sections, thousands of words) is rendered at once.
+     Skipping layout/paint for off-screen lines keeps resize/scroll reflow cheap.
+     Containment lives here rather than on .prayer-section/.paragraph because
+     paint containment clips overflowing descendants — the reveal-toggle is
+     positioned outside its paragraph's box and must stay visible. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 5rem;
 }
 .note-text {
   flex-basis: 100%;
@@ -311,7 +337,17 @@ function handleSelect(ref: string) {
   line-height: 1.6;
   margin: 0.3rem 0;
 }
-.reveal-toggle {
+.paragraph-tools {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-inline-start: 0.3rem;
+}
+.reveal-toggle,
+.inputs-toggle {
   background: none;
   border: 1px solid #ccc;
   border-radius: 999px;
@@ -320,8 +356,14 @@ function handleSelect(ref: string) {
   cursor: pointer;
   color: #555;
 }
-.reveal-toggle:hover {
+.reveal-toggle:hover,
+.inputs-toggle:hover {
   background: #f0f4ff;
+}
+/* visibility (not display) keeps the word grid from reflowing when toggled.
+   :deep is required because .word-input lives inside the HebrewWord child. */
+.inputs-hidden :deep(.word-input) {
+  visibility: hidden;
 }
 .english {
   display: block;
