@@ -7,6 +7,7 @@ const { sections, loading, errors, loadSection } = useSiddurSections()
 const openKeys = ref<Record<string, boolean>>({})
 const activeRef = ref<string | null>(null)
 const revealed = ref<Record<string, boolean>>({})
+const sidebarOpen = ref(false)
 
 function paragraphId(ref: string, index: number) {
   return `${ref}::${index}`
@@ -60,6 +61,7 @@ function sectionElementId(ref: string) {
 function handleSelect(ref: string) {
   activeRef.value = ref
   loadSection(ref)
+  sidebarOpen.value = false
   nextTick(() => {
     document.getElementById(sectionElementId(ref))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
@@ -68,17 +70,32 @@ function handleSelect(ref: string) {
 
 <template>
   <div class="layout">
-    <aside class="sidebar">
-      <h1 class="app-title">Weekday Siddur Chabad</h1>
-      <p v-if="tocPending">Loading table of contents…</p>
-      <p v-else-if="tocError">Failed to load table of contents.</p>
-      <TocTree
-        v-else-if="toc"
-        v-model:open-keys="openKeys"
-        :nodes="toc.sections"
-        :active-ref="activeRef"
-        @select="handleSelect"
-      />
+    <div v-if="sidebarOpen" class="sidebar-backdrop" @click="sidebarOpen = false" />
+
+    <aside class="sidebar" :class="{ 'sidebar-open': sidebarOpen }">
+      <button
+        type="button"
+        class="sidebar-toggle"
+        :aria-expanded="sidebarOpen"
+        aria-label="Toggle table of contents"
+        @click="sidebarOpen = !sidebarOpen"
+      >
+        <span class="menu-icon" aria-hidden="true">{{ sidebarOpen ? '✕' : '☰' }}</span>
+        <span class="toggle-label">Contents</span>
+      </button>
+
+      <div class="sidebar-body" :aria-hidden="!sidebarOpen">
+        <h1 class="app-title">Weekday Siddur Chabad</h1>
+        <p v-if="tocPending">Loading table of contents…</p>
+        <p v-else-if="tocError">Failed to load table of contents.</p>
+        <TocTree
+          v-else-if="toc"
+          v-model:open-keys="openKeys"
+          :nodes="toc.sections"
+          :active-ref="activeRef"
+          @select="handleSelect"
+        />
+      </div>
     </aside>
 
     <main class="content">
@@ -151,6 +168,7 @@ function handleSelect(ref: string) {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  background: #fff;
 }
 .app-title {
   font-size: 1.1rem;
@@ -160,6 +178,83 @@ function handleSelect(ref: string) {
   flex: 1;
   min-width: 0;
   padding: 1.5rem 2rem;
+}
+.sidebar-toggle {
+  display: none;
+}
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 40;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+  }
+
+  /* On mobile the sidebar itself is the toggle: collapsed it's a small pill in the
+     corner containing just the icon + label; clicking it grows the same element,
+     both horizontally and vertically, into the full off-canvas TOC panel. */
+  .sidebar {
+    position: fixed;
+    top: 0.75rem;
+    inset-inline-start: 0.75rem;
+    width: 8.5rem;
+    height: 2.75rem;
+    padding: 0;
+    border-inline-end: none;
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    overflow: hidden;
+    z-index: 50;
+    transition:
+      width 0.28s ease,
+      height 0.28s ease,
+      top 0.28s ease,
+      inset-inline-start 0.28s ease,
+      border-radius 0.28s ease;
+  }
+  .sidebar.sidebar-open {
+    top: 0;
+    inset-inline-start: 0;
+    width: 80vw;
+    max-width: 320px;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    height: 2.75rem;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 0 1rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .menu-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+
+  .sidebar-body {
+    padding: 0 1rem 1rem;
+    height: calc(100% - 2.75rem);
+    overflow-y: auto;
+  }
+
+  .content {
+    padding-top: 4rem;
+  }
 }
 .prayer-section {
   margin-bottom: 3rem;
