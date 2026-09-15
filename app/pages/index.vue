@@ -201,7 +201,9 @@ function handleSelect(ref: string) {
 .content {
   flex: 1;
   min-width: 0;
-  padding: 1.5rem 2rem;
+  /* Extra right padding leaves room for the .paragraph-tools column that
+     overflows each paragraph's right edge, plus the vertical scrollbar. */
+  padding: 1.5rem 4rem 1.5rem 2rem;
 }
 .sidebar-toggle {
   display: none;

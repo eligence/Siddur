@@ -20,6 +20,16 @@ function checkWord() {
   toggle(props.id)
   if (isOpen(props.id)) lookup(props.word)
 }
+
+/** Tab/Shift+Tab moves directly between word inputs, skipping the .word-he
+    buttons and inputs hidden by the paragraph's inputs toggle. */
+function onInputTab(e: KeyboardEvent) {
+  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.word-input')).filter(
+    (el) => !el.closest('.inputs-hidden'),
+  )
+  const idx = inputs.indexOf(e.currentTarget as HTMLInputElement)
+  inputs[idx + (e.shiftKey ? -1 : 1)]?.focus()
+}
 </script>
 
 <template>
@@ -31,6 +41,7 @@ function checkWord() {
       autocomplete="off"
       spellcheck="false"
       :aria-label="`English translation guess for ${word}`"
+      @keydown.tab.prevent="onInputTab"
     />
     <button type="button" class="word-he" dir="rtl" @click="checkWord">
       {{ word }}
@@ -74,7 +85,7 @@ function checkWord() {
   text-align: center;
 }
 .word-input:focus {
-  outline: 2px solid #4a90e2;
+  background-color: rgb(180 215 255 / 0.15);
   border-color: transparent;
 }
 .word-he {
