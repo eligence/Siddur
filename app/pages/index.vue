@@ -11,6 +11,8 @@ const activeRef = ref<string | null>(null)
 const showEnglish = ref(false)
 const showInputs = ref(false)
 const sidebarOpen = ref(false)
+const contentEl = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
 
 function wordId(ref: string, paraIndex: number, segIndex: number, wordIndex: number) {
   return `${ref}::${paraIndex}::${segIndex}::${wordIndex}`
@@ -65,6 +67,54 @@ function handleSelect(ref: string) {
     document.getElementById(sectionElementId(ref))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
 }
+
+/** Observe section elements and set activeRef to the topmost visible section. */
+function setupObserver() {
+  if (observer) observer.disconnect()
+  observer = new IntersectionObserver(
+    (entries) => {
+      // Find the entry closest to the top of the viewport that is intersecting.
+      let best: { ref: string; top: number } | null = null
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue
+        const ref = (entry.target as HTMLElement).dataset.ref
+        if (!ref) continue
+        const top = entry.boundingClientRect.top
+        if (!best || Math.abs(top) < Math.abs(best.top)) {
+          best = { ref, top }
+        }
+      }
+      if (best) activeRef.value = best.ref
+    },
+    { rootMargin: '-16px 0px -70% 0px', threshold: 0 },
+  )
+  for (const leaf of leaves.value) {
+    const el = document.getElementById(sectionElementId(leaf.ref!))
+    if (el) observer.observe(el)
+  }
+}
+
+/** Scroll the active TOC item into view inside the sidebar. */
+watch(activeRef, (ref) => {
+  if (!ref) return
+  nextTick(() => {
+    const el = document.querySelector(`.toc-leaf.active`) as HTMLElement | null
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  })
+})
+
+onMounted(() => {
+  if (import.meta.client) setupObserver()
+})
+
+// Sections render asynchronously, so re-observe whenever the leaf list changes.
+if (import.meta.client) {
+  watch(leaves, () => nextTick(() => setupObserver()))
+}
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+})
 </script>
 
 <template>
@@ -101,6 +151,7 @@ function handleSelect(ref: string) {
       <section
         v-for="leaf in leaves"
         :id="sectionElementId(leaf.ref!)"
+        :data-ref="leaf.ref"
         :key="leaf.ref"
         class="prayer-section"
       >
