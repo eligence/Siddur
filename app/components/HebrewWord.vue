@@ -3,6 +3,7 @@ const props = defineProps<{
   id: string
   word: string
   showInput: boolean
+  sentenceStart?: boolean
 }>()
 
 const { getValue, setValue, getVariations, addVariation, removeVariation, registerWordId } = useWordProgress()
@@ -39,7 +40,12 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 const showSelect = computed(() => variations.value.length > 1)
 
 function onInputBlur() {
-  addVariation(props.word, guess.value)
+  let value = guess.value
+  if (props.sentenceStart && value) {
+    value = value.charAt(0).toUpperCase() + value.slice(1)
+    setValue(props.id, value)
+  }
+  addVariation(props.word, value)
 }
 
 function selectVariation(value: string) {

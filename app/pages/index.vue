@@ -204,6 +204,7 @@ onBeforeUnmount(() => {
                       :id="wordId(leaf.ref!, i, si, wi)"
                       :word="word"
                       :show-input="showInputs"
+                      :sentence-start="wi === 0"
                     />
                   </template>
                 </template>

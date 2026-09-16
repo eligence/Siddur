@@ -58,7 +58,9 @@ export function useWordProgress() {
   function addVariation(word: string, value: string) {
     if (!value.trim()) return
     const list = variations.value[word] ?? []
-    if (!list.includes(value)) {
+    const lower = value.toLowerCase()
+    // Ignore case-insensitive duplicates (e.g. "blessed" vs "Blessed").
+    if (!list.some((v) => v.toLowerCase() === lower)) {
       variations.value[word] = [...list, value]
     }
     // Populate all inputs for the same Hebrew word with the entered value.
