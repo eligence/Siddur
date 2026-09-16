@@ -119,42 +119,61 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="layout">
-    <div v-if="sidebarOpen" class="sidebar-backdrop" @click="sidebarOpen = false" />
+    <UDashboardGroup>
+      <UDashboardSidebar v-model:open="sidebarOpen" collapsible :collapsed-size="0" :ui="{ root: 'min-w-0 z-50' }">
+        <template #default>
+          <h1 class="app-title">Weekday Siddur Chabad</h1>
+          <p v-if="tocPending">Loading table of contents…</p>
+          <p v-else-if="tocError">Failed to load table of contents.</p>
+          <TocTree
+            v-else-if="toc"
+            v-model:open-keys="openKeys"
+            :nodes="toc.sections"
+            :active-ref="activeRef"
+            @select="handleSelect"
+          />
+        </template>
+      </UDashboardSidebar>
 
-    <aside class="sidebar" :class="{ 'sidebar-open': sidebarOpen }">
-      <button
-        type="button"
-        class="sidebar-toggle"
-        :aria-expanded="sidebarOpen"
-        aria-label="Toggle table of contents"
-        @click="sidebarOpen = !sidebarOpen"
-      >
-        <span class="menu-icon" aria-hidden="true">{{ sidebarOpen ? '✕' : '☰' }}</span>
-        <span class="toggle-label">Contents</span>
-      </button>
+      <UDashboardPanel id="siddur">
+        <template #header>
+          <UDashboardNavbar>
+            <template #left>
+              <UDashboardSidebarCollapse class="hidden lg:flex" />
+            </template>
+            <template #right>
+              <UButton
+                :icon="showEnglish ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+                :color="showEnglish ? 'primary' : 'neutral'"
+                variant="outline"
+                size="sm"
+                :aria-pressed="showEnglish"
+                :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
+                :title="showEnglish ? 'Hide all translations' : 'Show all translations'"
+                @click="showEnglish = !showEnglish"
+              />
+              <UButton
+                :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
+                :color="showInputs ? 'primary' : 'neutral'"
+                variant="outline"
+                size="sm"
+                :aria-pressed="showInputs"
+                :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
+                :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
+                @click="showInputs = !showInputs"
+              />
+            </template>
+          </UDashboardNavbar>
+        </template>
 
-      <div class="sidebar-body" :aria-hidden="!sidebarOpen">
-        <h1 class="app-title">Weekday Siddur Chabad</h1>
-        <p v-if="tocPending">Loading table of contents…</p>
-        <p v-else-if="tocError">Failed to load table of contents.</p>
-        <TocTree
-          v-else-if="toc"
-          v-model:open-keys="openKeys"
-          :nodes="toc.sections"
-          :active-ref="activeRef"
-          @select="handleSelect"
-        />
-      </div>
-    </aside>
-
-    <main class="content">
-      <section
-        v-for="leaf in leaves"
-        :id="sectionElementId(leaf.ref!)"
-        :data-ref="leaf.ref"
-        :key="leaf.ref"
-        class="prayer-section"
-      >
+        <template #body>
+          <section
+            v-for="leaf in leaves"
+            :id="sectionElementId(leaf.ref!)"
+            :data-ref="leaf.ref"
+            :key="leaf.ref"
+            class="prayer-section"
+          >
         <h2>
           {{ leaf.title }}
           <span class="he-title">{{ leaf.heTitle }}</span>
@@ -195,30 +214,9 @@ onBeforeUnmount(() => {
 
         <p v-else class="status">Not loaded yet…</p>
       </section>
-    </main>
-
-    <UButton
-      :icon="showEnglish ? 'i-lucide-eye' : 'i-lucide-eye-off'"
-      :color="showEnglish ? 'primary' : 'neutral'"
-      variant="outline"
-      size="sm"
-      class="fixed bottom-4 start-4 z-50"
-      :aria-pressed="showEnglish"
-      :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
-      :title="showEnglish ? 'Hide all translations' : 'Show all translations'"
-      @click="showEnglish = !showEnglish"
-    />
-    <UButton
-      :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
-      :color="showInputs ? 'primary' : 'neutral'"
-      variant="outline"
-      size="sm"
-      class="fixed bottom-4 start-13 z-50"
-      :aria-pressed="showInputs"
-      :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
-      :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
-      @click="showInputs = !showInputs"
-    />
+        </template>
+      </UDashboardPanel>
+    </UDashboardGroup>
   </div>
 </template>
 
@@ -227,16 +225,8 @@ onBeforeUnmount(() => {
   display: flex;
   min-height: 100vh;
 }
-.sidebar {
-  width: 300px;
-  flex-shrink: 0;
-  padding: 1rem;
-  border-inline-end: 1px solid #ddd;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
-  background: #fff;
+:deep([data-collapsed="true"] [data-slot="body"]) {
+  display: none;
 }
 .app-title {
   font-size: 1.1rem;
@@ -263,82 +253,6 @@ onBeforeUnmount(() => {
 @media (min-width: 2560px) {
   .content {
     --cols: 18;
-  }
-}
-.sidebar-toggle {
-  display: none;
-}
-.sidebar-backdrop {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .sidebar-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 40;
-    opacity: 1;
-    transition: opacity 0.25s ease;
-  }
-
-  /* On mobile the sidebar itself is the toggle: collapsed it's a small tab flush
-     in the page corner containing just the icon + label; clicking it grows the
-     same element, both horizontally and vertically, into the full off-canvas TOC
-     panel. The upper-left corner never moves — only size and the rounded
-     bottom-right corner animate. */
-  .sidebar {
-    position: fixed;
-    top: 0;
-    inset-inline-start: 0;
-    width: 8.5rem;
-    height: 2.75rem;
-    padding: 0;
-    border-inline-end: none;
-    border-radius: 0;
-    border-end-end-radius: 1.25rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-    overflow: hidden;
-    z-index: 50;
-    transition:
-      width 0.28s ease,
-      height 0.28s ease,
-      border-end-end-radius 0.28s ease;
-  }
-  .sidebar.sidebar-open {
-    width: 80vw;
-    max-width: 320px;
-    height: 100vh;
-    border-end-end-radius: 0;
-  }
-
-  .sidebar-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    width: 100%;
-    height: 2.75rem;
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    padding: 0 1rem;
-    font-size: 0.9rem;
-    cursor: pointer;
-  }
-  .menu-icon {
-    font-size: 1.1rem;
-    line-height: 1;
-  }
-
-  .sidebar-body {
-    padding: 0 1rem 1rem;
-    height: calc(100% - 2.75rem);
-    overflow-y: auto;
-  }
-
-  .content {
-    padding-top: 4rem;
   }
 }
 .prayer-section {

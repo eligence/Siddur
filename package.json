@@ -7,7 +7,9 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "lint": "eslint \"./**/*.{ts,.vue}\" --ignore-pattern \"lang/scripts/\" .",
+    "lint:fix": "eslint \"./**/*.{ts,.vue}\" --ignore-pattern \"lang/scripts/\" --fix ."
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.132",
