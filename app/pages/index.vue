@@ -1,26 +1,19 @@
 <script setup lang="ts">
-import type { SectionParagraph, TocNode } from '../../shared/types/siddur'
+import type { TocNode } from '../../shared/types/siddur'
 
 const { data: toc, pending: tocPending, error: tocError } = await useSiddurToc()
 const { sections, loading, errors, loadSection } = useSiddurSections()
 
 const openKeys = ref<Record<string, boolean>>({})
 const activeRef = ref<string | null>(null)
-const revealed = ref<Record<string, boolean>>({})
-// Word inputs start hidden; the ✎ toggle reveals them per paragraph.
-const inputsShown = ref<Record<string, boolean>>({})
+// Global toggles in the fixed action bar: 👁 reveals every translation,
+// ✎ reveals every word input.
+const showEnglish = ref(false)
+const showInputs = ref(false)
 const sidebarOpen = ref(false)
-
-function paragraphId(ref: string, index: number) {
-  return `${ref}::${index}`
-}
 
 function wordId(ref: string, paraIndex: number, segIndex: number, wordIndex: number) {
   return `${ref}::${paraIndex}::${segIndex}::${wordIndex}`
-}
-
-function paragraphHasWords(para: SectionParagraph) {
-  return para.segments.some((s) => s.type === 'words' && s.words.length > 0)
 }
 
 /** Flatten the TOC tree into an ordered list of leaf (ref, title) entries. */
@@ -128,46 +121,23 @@ function handleSelect(ref: string) {
             :key="i"
             class="paragraph"
           >
-            <div class="paragraph-tools">
-              <button
-                v-if="para.en"
-                type="button"
-                class="reveal-toggle"
-                :class="{ active: revealed[paragraphId(leaf.ref!, i)] }"
-                :aria-pressed="revealed[paragraphId(leaf.ref!, i)]"
-                :aria-label="revealed[paragraphId(leaf.ref!, i)] ? 'Hide translation' : 'Show translation'"
-                :title="revealed[paragraphId(leaf.ref!, i)] ? 'Hide translation' : 'Show translation'"
-                @click="revealed[paragraphId(leaf.ref!, i)] = !revealed[paragraphId(leaf.ref!, i)]"
-              >
-                👁
-              </button>
-              <button
-                v-if="paragraphHasWords(para)"
-                type="button"
-                class="inputs-toggle"
-                :class="{ active: inputsShown[paragraphId(leaf.ref!, i)] }"
-                :aria-pressed="inputsShown[paragraphId(leaf.ref!, i)]"
-                :aria-label="inputsShown[paragraphId(leaf.ref!, i)] ? 'Hide input fields' : 'Show input fields'"
-                :title="inputsShown[paragraphId(leaf.ref!, i)] ? 'Hide input fields' : 'Show input fields'"
-                @click="inputsShown[paragraphId(leaf.ref!, i)] = !inputsShown[paragraphId(leaf.ref!, i)]"
-              >
-                ✎
-              </button>
-            </div>
+            <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
 
-            <div class="hebrew-line" :class="{ 'inputs-hidden': !inputsShown[paragraphId(leaf.ref!, i)] }">
-              <span v-if="para.en && revealed[paragraphId(leaf.ref!, i)]" class="english" v-html="para.en" />
-              <template v-for="(seg, si) in para.segments" :key="si">
-                <span v-if="seg.type === 'note'" class="note-text" dir="rtl" v-html="seg.html" />
-                <template v-else>
-                  <HebrewWord
-                    v-for="(word, wi) in seg.words"
-                    :key="wi"
-                    :id="wordId(leaf.ref!, i, si, wi)"
-                    :word="word"
-                  />
+            <div class="line-wrap">
+              <div class="hebrew-line">
+                <template v-for="(seg, si) in para.segments" :key="si">
+                  <span v-if="seg.type === 'note'" class="note-text" dir="rtl" v-html="seg.html" />
+                  <template v-else>
+                    <HebrewWord
+                      v-for="(word, wi) in seg.words"
+                      :key="wi"
+                      :id="wordId(leaf.ref!, i, si, wi)"
+                      :word="word"
+                      :show-input="showInputs"
+                    />
+                  </template>
                 </template>
-              </template>
+              </div>
             </div>
           </div>
         </template>
@@ -175,6 +145,29 @@ function handleSelect(ref: string) {
         <p v-else class="status">Not loaded yet…</p>
       </section>
     </main>
+
+    <button
+      type="button"
+      class="action-toggle"
+      :class="{ active: showEnglish }"
+      :aria-pressed="showEnglish"
+      :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
+      :title="showEnglish ? 'Hide all translations' : 'Show all translations'"
+      @click="showEnglish = !showEnglish"
+    >
+      👁
+    </button>
+    <button
+      type="button"
+      class="action-toggle"
+      :class="{ active: showInputs }"
+      :aria-pressed="showInputs"
+      :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
+      :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
+      @click="showInputs = !showInputs"
+    >
+      ✎
+    </button>
   </div>
 </template>
 
@@ -201,9 +194,25 @@ function handleSelect(ref: string) {
 .content {
   flex: 1;
   min-width: 0;
-  /* Extra right padding leaves room for the .paragraph-tools column that
-     overflows each paragraph's right edge, plus the vertical scrollbar. */
-  padding: 1.5rem 4rem 1.5rem 2rem;
+  padding: 1.5rem 2rem;
+  /* Fixed column count per breakpoint; consumed by .word-cell in HebrewWord.vue
+     to size every cell identically. Default covers ≤1023px. */
+  --cols: 5;
+}
+@media (min-width: 1024px) {
+  .content {
+    --cols: 8;
+  }
+}
+@media (min-width: 1440px) {
+  .content {
+    --cols: 12;
+  }
+}
+@media (min-width: 2560px) {
+  .content {
+    --cols: 18;
+  }
 }
 .sidebar-toggle {
   display: none;
@@ -314,44 +323,30 @@ function handleSelect(ref: string) {
 .paragraph {
   margin-bottom: 1.25rem;
   text-align: right;
-  position: relative;
+  --english-h: 1.4rem;
 }
 .hebrew-line {
-  /* Fixed column count per breakpoint; consumed by .word-cell in HebrewWord.vue
-     to size every cell identically. Default covers ≤1023px (425px tier). */
-  --cols: 5;
   display: flex;
   flex-wrap: wrap;
   /* stretch (not flex-end) so every .word-cell in a row gets equal height —
      .word-he then grows to fill its cell and the .word-input row stays aligned. */
   align-items: stretch;
   gap: 0 0.2rem;
-  margin: 0 0 0.5rem;
   direction: rtl;
   /* The whole siddur (dozens of sections, thousands of words) is rendered at once.
      Skipping layout/paint for off-screen lines keeps resize/scroll reflow cheap.
-     Containment lives here rather than on .prayer-section/.paragraph because
-     paint containment clips overflowing descendants — the reveal-toggle is
-     positioned outside its paragraph's box and must stay visible. */
+     Paint containment clips overflowing descendants, so a line hosting an open
+     .word-popover drops containment via the :has rule below. */
   content-visibility: auto;
   contain-intrinsic-size: auto 5rem;
 }
-@media (min-width: 1024px) {
-  .hebrew-line {
-    --cols: 8;
-  }
-}
-@media (min-width: 1440px) {
-  .hebrew-line {
-    --cols: 12;
-  }
-}
-@media (min-width: 2560px) {
-  .hebrew-line {
-    --cols: 18;
-  }
+/* Paint containment clips a .word-popover that overflows the line's box (e.g.
+   on the last row), so a line hosting an open popover must drop containment. */
+.hebrew-line:has(.word-popover) {
+  content-visibility: visible;
 }
 .note-text {
+  display: block;
   flex-basis: 100%;
   font-size: 0.85rem;
   color: #888;
@@ -359,33 +354,37 @@ function handleSelect(ref: string) {
   line-height: 1.6;
   margin: 0.3rem 0;
 }
-.paragraph-tools {
-  position: absolute;
-  left: 100%;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding-inline-start: 0.3rem;
-}
-.reveal-toggle,
-.inputs-toggle {
-  background: none;
+/* Global 👁/✎ toggles fixed to the page's bottom-left corner so they stay
+   visible regardless of scroll or sidebar state. No wrapper: the second
+   button is offset by one button-width via the sibling selector. */
+.action-toggle {
+  position: fixed;
+  bottom: 1rem;
+  inset-inline-start: 1rem;
+  z-index: 60;
+  background: #fff;
   border: 1px solid #ccc;
   border-radius: 999px;
   font-size: 0.75rem;
   padding: 0.2rem 0.7rem;
   cursor: pointer;
   color: #555;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
 }
-.reveal-toggle:hover,
-.inputs-toggle:hover {
+.action-toggle + .action-toggle {
+  inset-inline-start: 3rem;
+}
+.action-toggle:hover {
   background: #f0f4ff;
 }
-/* visibility (not display) keeps the word grid from reflowing when toggled.
-   :deep is required because .word-input lives inside the HebrewWord child. */
-.inputs-hidden :deep(.word-input) {
-  visibility: hidden;
+.action-toggle.active {
+  background: #e4ecff;
+  border-color: #9db8f0;
+}
+.line-wrap {
+  margin: 0 0 0.5rem;
+  /* Fixed input height consumed by .word-input in HebrewWord.vue. */
+  --word-input-h: 1.4rem;
 }
 .english {
   display: block;
@@ -393,5 +392,6 @@ function handleSelect(ref: string) {
   color: #333;
   margin: 0.5rem 0 0;
   text-align: right;
+  min-height: var(--english-h);
 }
 </style>

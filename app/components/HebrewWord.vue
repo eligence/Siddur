@@ -2,6 +2,7 @@
 const props = defineProps<{
   id: string
   word: string
+  showInput: boolean
 }>()
 
 const { getValue, setValue } = useWordProgress()
@@ -22,10 +23,10 @@ function checkWord() {
 }
 
 /** Tab/Shift+Tab moves directly between word inputs, skipping the .word-he
-    buttons and inputs hidden by the paragraph's inputs toggle. */
+    buttons and inputs hidden by a row's inputs toggle. */
 function onInputTab(e: KeyboardEvent) {
   const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('.word-input')).filter(
-    (el) => !el.closest('.inputs-hidden'),
+    (el) => !el.closest('.input-hidden'),
   )
   const idx = inputs.indexOf(e.currentTarget as HTMLInputElement)
   inputs[idx + (e.shiftKey ? -1 : 1)]?.focus()
@@ -33,7 +34,7 @@ function onInputTab(e: KeyboardEvent) {
 </script>
 
 <template>
-  <span class="word-cell">
+  <span class="word-cell" :class="{ 'input-hidden': !showInput }">
     <input
       v-model="guess"
       class="word-input"
@@ -78,6 +79,9 @@ function onInputTab(e: KeyboardEvent) {
   width: 100%;
   min-width: 3.5rem;
   box-sizing: border-box;
+  /* Fixed height lets .inputs-toggle offset exactly one input row (see
+     --word-input-h on .line-wrap in index.vue). */
+  height: var(--word-input-h, 1.4rem);
   font-size: 0.75rem;
   padding: 0.15rem 0.3rem;
   margin-bottom: 0.2rem;
@@ -89,6 +93,10 @@ function onInputTab(e: KeyboardEvent) {
 .word-input:focus {
   background-color: rgb(180 215 255 / 0.15);
   border-color: transparent;
+}
+/* display (not visibility) collapses the input so hidden rows stay compact. */
+.input-hidden .word-input {
+  display: none;
 }
 .word-he {
   background: none;
