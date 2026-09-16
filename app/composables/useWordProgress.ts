@@ -1,5 +1,10 @@
 const STORAGE_KEY = 'siddur:word-progress-v3'
 
+/** Strip Hebrew/English punctuation so words like בְּרֵאשִׁית and בְּרֵאשִׁית, share the same key. */
+function normalizeWord(word: string): string {
+  return word.replace(/[^\p{L}\p{N}]/gu, '')
+}
+
 /**
  * Reactive, localStorage-backed storage with two layers:
  * - variations: Record<hebrewWord, string[]> — shared pool of all guesses
@@ -52,33 +57,35 @@ export function useWordProgress() {
   }
 
   function getVariations(word: string): string[] {
-    return variations.value[word] ?? []
+    return variations.value[normalizeWord(word)] ?? []
   }
 
   function addVariation(word: string, value: string) {
     if (!value.trim()) return
-    const list = variations.value[word] ?? []
+    const key = normalizeWord(word)
+    const list = variations.value[key] ?? []
     const lower = value.toLowerCase()
     // Ignore case-insensitive duplicates (e.g. "blessed" vs "Blessed").
     if (!list.some((v) => v.toLowerCase() === lower)) {
-      variations.value[word] = [...list, value]
+      variations.value[key] = [...list, value]
     }
     // Populate all inputs for the same Hebrew word with the entered value.
-    for (const id of wordToIds.value[word] ?? []) {
+    for (const id of wordToIds.value[key] ?? []) {
       selections.value[id] = value
     }
   }
 
   function registerWordId(word: string, id: string) {
-    const list = wordToIds.value[word] ?? []
+    const key = normalizeWord(word)
+    const list = wordToIds.value[key] ?? []
     if (!list.includes(id)) {
-      wordToIds.value[word] = [...list, id]
+      wordToIds.value[key] = [...list, id]
     }
     // On reload, wordToIds is empty so addVariation never propagated.
     // If this word has variations but no selection for this ID, auto-populate
     // with the most recent variation.
     if (!selections.value[id]) {
-      const vars = variations.value[word] ?? []
+      const vars = variations.value[key] ?? []
       if (vars.length) {
         selections.value[id] = vars[vars.length - 1]
       }
@@ -86,8 +93,9 @@ export function useWordProgress() {
   }
 
   function removeVariation(word: string, value: string) {
-    const list = variations.value[word] ?? []
-    variations.value[word] = list.filter((v) => v !== value)
+    const key = normalizeWord(word)
+    const list = variations.value[key] ?? []
+    variations.value[key] = list.filter((v) => v !== value)
     // Clear any per-occurrence selections that pointed at the removed value.
     for (const id of Object.keys(selections.value)) {
       if (selections.value[id] === value) selections.value[id] = ''
