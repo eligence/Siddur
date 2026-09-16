@@ -53,8 +53,8 @@ export function buildToc(node: SefariaSchemaNode, parentKeys: string[] = []): To
 }
 
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u
-const OPENING_PUNCT = /^[\p{Ps}\p{Pi}]+$/u
-const CLOSING_PUNCT = /^[\p{Pe}\p{Pf}]+$/u
+const OPENING_PUNCT = /[\p{Ps}\p{Pi}]/u
+const CLOSING_PUNCT = /[\p{Pe}\p{Pf}]/u
 
 /**
  * Merge tokens that are only punctuation into neighboring words so they don't
@@ -62,23 +62,38 @@ const CLOSING_PUNCT = /^[\p{Pe}\p{Pf}]+$/u
  * to the NEXT word ("(word"), everything else (sof pasuq, periods, closing
  * brackets…) to the previous one ("word)"). At a words-segment boundary the
  * merge crosses into the next/previous words segment — note segments are never
- * touched, EXCEPT a bracket pair wrapping a note ("( <small>note</small> )"),
+ * touched, EXCEPT a bracket pair wrapping a note ("( <small>note</small> )."),
  * which merges into the note so the whole parenthetical renders in note style.
  */
 function mergePunctuationTokens(segments: HebrewSegment[]) {
-  // Bracket pair wrapping a note: fold both into the note's HTML.
+  // Bracket pair wrapping a note: fold all trailing punct from before and all
+  // leading punct from after into the note's HTML.
   for (let si = 0; si + 2 < segments.length; si++) {
     const before = segments[si]!
     const note = segments[si + 1]!
     const after = segments[si + 2]!
     if (before.type !== 'words' || note.type !== 'note' || after.type !== 'words') continue
-    const open = before.words[before.words.length - 1]
-    const close = after.words[0]
-    if (open && close && OPENING_PUNCT.test(open) && CLOSING_PUNCT.test(close)) {
-      note.html = open + note.html + close
-      before.words.pop()
-      after.words.shift()
-    }
+
+    // Collect trailing punctuation tokens from before.words.
+    let openEnd = before.words.length
+    while (openEnd > 0 && !LETTER_OR_DIGIT.test(before.words[openEnd - 1]!)) openEnd--
+    if (openEnd === before.words.length) continue
+
+    // Collect leading punctuation tokens from after.words.
+    let closeStart = 0
+    while (closeStart < after.words.length && !LETTER_OR_DIGIT.test(after.words[closeStart]!)) closeStart++
+    if (closeStart === 0) continue
+
+    const openTokens = before.words.slice(openEnd)
+    const closeTokens = after.words.slice(0, closeStart)
+
+    // before's last punct must contain an opening bracket, after's must contain a closing one.
+    if (!OPENING_PUNCT.test(openTokens[openTokens.length - 1]!)) continue
+    if (!closeTokens.some((t) => CLOSING_PUNCT.test(t))) continue
+
+    note.html = openTokens.join('') + note.html + closeTokens.join('')
+    before.words = before.words.slice(0, openEnd)
+    after.words = after.words.slice(closeStart)
   }
 
   const appendToPrev = (segIdx: number, token: string): boolean => {
@@ -174,9 +189,9 @@ interface SefariaV3TextsResponse {
 /** Fetch bilingual text for a given ref and cache it in Nitro storage. */
 export async function fetchSefariaText(ref: string): Promise<SectionText> {
   const storage = useStorage('cache')
-  // v6: punctuation-only tokens merge into neighboring words, crossing segment
-  // boundaries; a bracket pair wrapping a note merges into the note itself.
-  const cacheKey = `sefaria:text:v6:${ref}`
+  // v7: bracket pairs wrapping a note now consume all adjacent punct tokens
+  // (handles ). and similar mixed-punct tails).
+  const cacheKey = `sefaria:text:v7:${ref}`
   const cached = await storage.getItem<SectionText>(cacheKey)
   if (cached) return cached
 
