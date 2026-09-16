@@ -1,11 +1,15 @@
-const STORAGE_KEY = 'siddur:word-progress-v2'
+const STORAGE_KEY = 'siddur:word-progress-v3'
 
 /**
- * Reactive, localStorage-backed map of the user's typed English guesses,
- * keyed by Hebrew word text so all occurrences of the same word share one value.
+ * Reactive, localStorage-backed storage with two layers:
+ * - variations: Record<hebrewWord, string[]> — shared pool of all guesses
+ *   entered for a given Hebrew word across every occurrence.
+ * - selections: Record<occurrenceId, string> — the active value for a specific
+ *   word-input, so selecting a variation only affects that one input.
  */
 export function useWordProgress() {
-  const progress = useState<Record<string, string>>('word-progress', () => ({}))
+  const variations = useState<Record<string, string[]>>('word-variations', () => ({}))
+  const selections = useState<Record<string, string>>('word-selections', () => ({}))
 
   if (import.meta.client) {
     const loaded = useState('word-progress-loaded', () => false)
@@ -13,15 +17,22 @@ export function useWordProgress() {
       loaded.value = true
       try {
         const raw = localStorage.getItem(STORAGE_KEY)
-        if (raw) Object.assign(progress.value, JSON.parse(raw))
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (parsed.variations) Object.assign(variations.value, parsed.variations)
+          if (parsed.selections) Object.assign(selections.value, parsed.selections)
+        }
       } catch {
         // ignore corrupt/inaccessible storage
       }
       watch(
-        progress,
-        (value) => {
+        [variations, selections],
+        () => {
           try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({ variations: variations.value, selections: selections.value }),
+            )
           } catch {
             // ignore quota/access errors
           }
@@ -32,12 +43,24 @@ export function useWordProgress() {
   }
 
   function getValue(id: string) {
-    return progress.value[id] ?? ''
+    return selections.value[id] ?? ''
   }
 
   function setValue(id: string, value: string) {
-    progress.value[id] = value
+    selections.value[id] = value
   }
 
-  return { progress, getValue, setValue }
+  function getVariations(word: string): string[] {
+    return variations.value[word] ?? []
+  }
+
+  function addVariation(word: string, value: string) {
+    if (!value.trim()) return
+    const list = variations.value[word] ?? []
+    if (!list.includes(value)) {
+      variations.value[word] = [...list, value]
+    }
+  }
+
+  return { getValue, setValue, getVariations, addVariation }
 }

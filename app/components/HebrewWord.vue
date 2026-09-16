@@ -5,17 +5,26 @@ const props = defineProps<{
   showInput: boolean
 }>()
 
-const { getValue, setValue } = useWordProgress()
+const { getValue, setValue, getVariations, addVariation } = useWordProgress()
 const { lookup, stateFor } = useLexicon()
 const { isOpen, toggle } = useWordPopover()
 
 const open = computed(() => isOpen(props.id))
 const lookupState = computed(() => stateFor(props.word))
+const variations = computed(() => getVariations(props.word))
 
 const guess = computed({
-  get: () => getValue(props.word),
-  set: (value: string) => setValue(props.word, value),
+  get: () => getValue(props.id),
+  set: (value: string) => setValue(props.id, value),
 })
+
+function onInputBlur() {
+  addVariation(props.word, guess.value)
+}
+
+function selectVariation(value: string) {
+  setValue(props.id, value)
+}
 
 function checkWord() {
   toggle(props.id)
@@ -43,7 +52,18 @@ function onInputTab(e: KeyboardEvent) {
       spellcheck="false"
       :aria-label="`English translation guess for ${word}`"
       @keydown.tab.prevent="onInputTab"
+      @blur="onInputBlur"
     />
+    <select
+      v-if="variations.length > 1"
+      class="word-variation-select"
+      :value="guess"
+      aria-label="Select a saved variation"
+      @change="selectVariation(($event.target as HTMLSelectElement).value)"
+    >
+      <option value="" disabled>Select…</option>
+      <option v-for="v in variations" :key="v" :value="v">{{ v }}</option>
+    </select>
     <button type="button" class="word-he" dir="rtl" @click="checkWord">
       {{ word }}
     </button>
@@ -95,8 +115,22 @@ function onInputTab(e: KeyboardEvent) {
   border-color: transparent;
 }
 /* display (not visibility) collapses the input so hidden rows stay compact. */
-.input-hidden .word-input {
+.input-hidden .word-input,
+.input-hidden .word-variation-select {
   display: none;
+}
+.word-variation-select {
+  width: 100%;
+  box-sizing: border-box;
+  height: 1.2rem;
+  font-size: 0.7rem;
+  padding: 0 0.2rem;
+  margin-bottom: 0.2rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  direction: ltr;
+  text-align: center;
+  cursor: pointer;
 }
 .word-he {
   background: none;
