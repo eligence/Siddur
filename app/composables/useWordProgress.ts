@@ -62,5 +62,14 @@ export function useWordProgress() {
     }
   }
 
-  return { getValue, setValue, getVariations, addVariation }
+  function removeVariation(word: string, value: string) {
+    const list = variations.value[word] ?? []
+    variations.value[word] = list.filter((v) => v !== value)
+    // Clear any per-occurrence selections that pointed at the removed value.
+    for (const id of Object.keys(selections.value)) {
+      if (selections.value[id] === value) selections.value[id] = ''
+    }
+  }
+
+  return { getValue, setValue, getVariations, addVariation, removeVariation }
 }
