@@ -74,6 +74,15 @@ export function useWordProgress() {
     if (!list.includes(id)) {
       wordToIds.value[word] = [...list, id]
     }
+    // On reload, wordToIds is empty so addVariation never propagated.
+    // If this word has variations but no selection for this ID, auto-populate
+    // with the most recent variation.
+    if (!selections.value[id]) {
+      const vars = variations.value[word] ?? []
+      if (vars.length) {
+        selections.value[id] = vars[vars.length - 1]
+      }
+    }
   }
 
   function removeVariation(word: string, value: string) {
