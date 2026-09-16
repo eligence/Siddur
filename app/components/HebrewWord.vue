@@ -5,7 +5,7 @@ const props = defineProps<{
   showInput: boolean
 }>()
 
-const { getValue, setValue, getVariations, addVariation, removeVariation } = useWordProgress()
+const { getValue, setValue, getVariations, addVariation, removeVariation, registerWordId } = useWordProgress()
 const { lookup, stateFor } = useLexicon()
 const { isOpen, toggle } = useWordPopover()
 
@@ -28,7 +28,10 @@ function onDocumentClick(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onDocumentClick))
+onMounted(() => {
+  document.addEventListener('click', onDocumentClick)
+  registerWordId(props.word, props.id)
+})
 onBeforeUnmount(() => document.removeEventListener('click', onDocumentClick))
 
 // 0 variations → plain input. 1 variation → plain input pre-filled.

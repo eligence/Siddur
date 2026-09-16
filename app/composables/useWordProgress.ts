@@ -10,6 +10,7 @@ const STORAGE_KEY = 'siddur:word-progress-v3'
 export function useWordProgress() {
   const variations = useState<Record<string, string[]>>('word-variations', () => ({}))
   const selections = useState<Record<string, string>>('word-selections', () => ({}))
+  const wordToIds = useState<Record<string, string[]>>('word-to-ids', () => ({}))
 
   if (import.meta.client) {
     const loaded = useState('word-progress-loaded', () => false)
@@ -60,6 +61,17 @@ export function useWordProgress() {
     if (!list.includes(value)) {
       variations.value[word] = [...list, value]
     }
+    // Populate all inputs for the same Hebrew word with the entered value.
+    for (const id of wordToIds.value[word] ?? []) {
+      selections.value[id] = value
+    }
+  }
+
+  function registerWordId(word: string, id: string) {
+    const list = wordToIds.value[word] ?? []
+    if (!list.includes(id)) {
+      wordToIds.value[word] = [...list, id]
+    }
   }
 
   function removeVariation(word: string, value: string) {
@@ -71,5 +83,5 @@ export function useWordProgress() {
     }
   }
 
-  return { getValue, setValue, getVariations, addVariation, removeVariation }
+  return { getValue, setValue, getVariations, addVariation, removeVariation, registerWordId }
 }
