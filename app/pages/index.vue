@@ -146,28 +146,28 @@ function handleSelect(ref: string) {
       </section>
     </main>
 
-    <button
-      type="button"
-      class="action-toggle"
-      :class="{ active: showEnglish }"
+    <UButton
+      :icon="showEnglish ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+      :color="showEnglish ? 'primary' : 'neutral'"
+      variant="outline"
+      size="sm"
+      class="fixed bottom-4 start-4 z-50"
       :aria-pressed="showEnglish"
       :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
       :title="showEnglish ? 'Hide all translations' : 'Show all translations'"
       @click="showEnglish = !showEnglish"
-    >
-      👁
-    </button>
-    <button
-      type="button"
-      class="action-toggle"
-      :class="{ active: showInputs }"
+    />
+    <UButton
+      :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
+      :color="showInputs ? 'primary' : 'neutral'"
+      variant="outline"
+      size="sm"
+      class="fixed bottom-4 start-13 z-50"
       :aria-pressed="showInputs"
       :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
       :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
       @click="showInputs = !showInputs"
-    >
-      ✎
-    </button>
+    />
   </div>
 </template>
 
@@ -353,33 +353,6 @@ function handleSelect(ref: string) {
   font-style: italic;
   line-height: 1.6;
   margin: 0.3rem 0;
-}
-/* Global 👁/✎ toggles fixed to the page's bottom-left corner so they stay
-   visible regardless of scroll or sidebar state. No wrapper: the second
-   button is offset by one button-width via the sibling selector. */
-.action-toggle {
-  position: fixed;
-  bottom: 1rem;
-  inset-inline-start: 1rem;
-  z-index: 60;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  padding: 0.2rem 0.7rem;
-  cursor: pointer;
-  color: #555;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
-.action-toggle + .action-toggle {
-  inset-inline-start: 3rem;
-}
-.action-toggle:hover {
-  background: #f0f4ff;
-}
-.action-toggle.active {
-  background: #e4ecff;
-  border-color: #9db8f0;
 }
 .line-wrap {
   margin: 0 0 0.5rem;

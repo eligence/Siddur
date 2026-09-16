@@ -2,6 +2,13 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-01-01',
   devtools: { enabled: true },
+  modules: ['@nuxt/ui'],
+  ui: {
+    // Light mode only — disables @nuxtjs/color-mode so the app never follows
+    // the OS dark preference.
+    colorMode: false,
+  },
+  css: ['~/assets/css/main.css'],
   routeRules: {
     '/': { prerender: true },
     // Sefaria data is already cached (and invalidatable) via useStorage in
