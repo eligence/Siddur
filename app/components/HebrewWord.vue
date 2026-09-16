@@ -13,8 +13,8 @@ const open = computed(() => isOpen(props.id))
 const lookupState = computed(() => stateFor(props.word))
 
 const guess = computed({
-  get: () => getValue(props.id),
-  set: (value: string) => setValue(props.id, value),
+  get: () => getValue(props.word),
+  set: (value: string) => setValue(props.word, value),
 })
 
 function checkWord() {

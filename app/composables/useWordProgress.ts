@@ -1,8 +1,8 @@
-const STORAGE_KEY = 'siddur:word-progress'
+const STORAGE_KEY = 'siddur:word-progress-v2'
 
 /**
  * Reactive, localStorage-backed map of the user's typed English guesses,
- * keyed by a unique id per word occurrence (ref + paragraph index + word index).
+ * keyed by Hebrew word text so all occurrences of the same word share one value.
  */
 export function useWordProgress() {
   const progress = useState<Record<string, string>>('word-progress', () => ({}))
