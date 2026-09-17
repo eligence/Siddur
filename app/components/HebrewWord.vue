@@ -3,6 +3,8 @@ const props = defineProps<{
   id: string
   word: string
   showInput: boolean
+  /** Translation view: render the guess as read-only text instead of an input. */
+  showValue?: boolean
   sentenceStart?: boolean
 }>()
 
@@ -84,9 +86,10 @@ function onInputTab(e: KeyboardEvent) {
 </script>
 
 <template>
-  <span class="word-cell" :class="{ 'input-hidden': !showInput }">
+  <span class="word-cell" :class="{ 'input-hidden': !showInput && !showValue }">
+    <span v-if="showValue" class="word-value">{{ guess }}</span>
     <input
-      v-if="!showSelect"
+      v-else-if="!showSelect"
       v-model="guess"
       class="word-input"
       type="text"
@@ -186,6 +189,23 @@ function onInputTab(e: KeyboardEvent) {
 .word-input:focus {
   background-color: rgb(180 215 255 / 0.15);
   border-color: transparent;
+}
+/* Read-only display of the guess when translations are shown. Matches
+   .word-input metrics so the row height stays identical. */
+.word-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--word-input-h, 1.4rem);
+  font-size: 0.75rem;
+  margin-bottom: 0.2rem;
+  direction: ltr;
+  text-align: center;
+  color: #444;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 /* display (not visibility) collapses the input so hidden rows stay compact. */
 .input-hidden .word-input,

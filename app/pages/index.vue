@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { TocNode } from '~~/shared/types/siddur'
+import type { SectionParagraph, TocNode } from '~~/shared/types/siddur'
 import type { NavigationMenuItem } from '@nuxt/ui'
 
 const { data: toc, pending: tocPending, error: tocError } = await useSiddurToc()
 const { sections, loading, errors, loadSection } = useSiddurSections()
 const { drafts, getDraft, setDraft, clearDraft, hasDraft } = useTranslationDrafts()
+const { getValue } = useWordProgress()
 
 const activeRef = ref<string | null>(null)
 // Global toggles in the fixed action bar: 👁 reveals every translation,
@@ -25,6 +26,18 @@ const reviewing = ref(false)
 
 function paraKey(ref: string, paraIndex: number) {
   return `${ref}::${paraIndex}`
+}
+
+/** True when the paragraph has at least one word input and every word input
+    has a non-empty value. Note-only paragraphs (no inputs) don't qualify. */
+function paraInputsFilled(ref: string, para: SectionParagraph, paraIndex: number) {
+  let hasWords = false
+  const allFilled = para.segments.every((seg, si) => {
+    if (seg.type === 'note') return true
+    if (seg.words.length) hasWords = true
+    return seg.words.every((_, wi) => getValue(wordId(ref, paraIndex, si, wi)).trim() !== '')
+  })
+  return hasWords && allFilled
 }
 
 function startEdit(ref: string, paraIndex: number) {
@@ -284,10 +297,10 @@ onBeforeUnmount(() => {
           >
             <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
 
-            <!-- Translation editor -->
-            <div v-if="showEnglish" class="translation-editor">
+            <!-- Translation editor — only in editing mode (word inputs visible) -->
+            <div v-if="showInputs" class="translation-editor">
               <button
-                v-if="editingPara !== paraKey(leaf.ref!, i)"
+                v-if="editingPara !== paraKey(leaf.ref!, i) && paraInputsFilled(leaf.ref!, para, i)"
                 type="button"
                 class="edit-translation-btn"
                 @click="startEdit(leaf.ref!, i)"
@@ -330,6 +343,7 @@ onBeforeUnmount(() => {
                       :id="wordId(leaf.ref!, i, si, wi)"
                       :word="word"
                       :show-input="showInputs"
+                      :show-value="showEnglish"
                       :sentence-start="wi === 0"
                     />
                   </template>
