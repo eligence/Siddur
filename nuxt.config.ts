@@ -7,6 +7,11 @@ export default defineNuxtConfig({
     // Light mode only — disables @nuxtjs/color-mode so the app never follows
     // the OS dark preference.
     colorMode: false,
+    theme: {
+      // Replaces the default list, so every semantic color must be listed.
+      // Each name also needs a palette mapping in app/app.config.ts ui.colors.
+      colors: ['primary', 'secondary', 'success', 'info', 'warning', 'error', 'gray'],
+    },
   },
   css: ['~/assets/css/main.css'],
   runtimeConfig: {

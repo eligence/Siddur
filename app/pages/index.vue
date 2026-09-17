@@ -223,8 +223,8 @@ onBeforeUnmount(() => {
             </template>
             <template #right>
               <UButton
-                :icon="showEnglish ? 'i-lucide-eye' : 'i-lucide-eye-off'"
-                :color="showEnglish ? 'primary' : 'neutral'"
+                :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
+                color="neutral"
                 variant="outline"
                 size="sm"
                 :aria-pressed="showEnglish"
@@ -234,7 +234,7 @@ onBeforeUnmount(() => {
               />
               <UButton
                 :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
-                :color="showInputs ? 'primary' : 'neutral'"
+                color="neutral"
                 variant="outline"
                 size="sm"
                 :aria-pressed="showInputs"
