@@ -198,11 +198,12 @@ function onInputTab(e: KeyboardEvent) {
   justify-content: center;
   width: 100%;
   height: var(--word-input-h, 1.4rem);
-  font-size: 0.75rem;
+  font-family: var(--translation-font, inherit);
+  font-size: var(--translation-size, 0.75rem);
   margin-bottom: 0.2rem;
   direction: ltr;
   text-align: center;
-  color: #444;
+  color: var(--translation-color, #444);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -323,10 +324,11 @@ function onInputTab(e: KeyboardEvent) {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.3rem;
+  font-family: var(--hebrew-font, inherit);
+  font-size: var(--hebrew-size, 1.3rem);
   line-height: 1.7;
   padding: 0;
-  color: inherit;
+  color: var(--hebrew-color, inherit);
   border-radius: 4px;
   /* Grow to fill the cell's stretched height so all .word-he in a row are
      equal height; the word itself stays top-centered. */
