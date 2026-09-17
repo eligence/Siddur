@@ -12,6 +12,16 @@ const activeRef = ref<string | null>(null)
 // ✎ reveals every word input.
 const showEnglish = ref(false)
 const showInputs = ref(false)
+
+// The two view modes are mutually exclusive.
+function toggleEnglish() {
+  showEnglish.value = !showEnglish.value
+  if (showEnglish.value) showInputs.value = false
+}
+function toggleInputs() {
+  showInputs.value = !showInputs.value
+  if (showInputs.value) showEnglish.value = false
+}
 const sidebarOpen = ref(false)
 const contentEl = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
@@ -243,7 +253,7 @@ onBeforeUnmount(() => {
                 :aria-pressed="showEnglish"
                 :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
                 :title="showEnglish ? 'Hide all translations' : 'Show all translations'"
-                @click="showEnglish = !showEnglish"
+                @click="toggleEnglish"
               />
               <UButton
                 :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
@@ -253,7 +263,7 @@ onBeforeUnmount(() => {
                 :aria-pressed="showInputs"
                 :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
                 :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
-                @click="showInputs = !showInputs"
+                @click="toggleInputs"
               />
               <UButton
                 icon="i-lucide-download"

@@ -86,7 +86,7 @@ function onInputTab(e: KeyboardEvent) {
 </script>
 
 <template>
-  <span class="word-cell" :class="{ 'input-hidden': !showInput && !showValue }">
+  <span class="word-cell" :class="{ 'input-hidden': !showInput && !showValue, 'showing-value': showValue }">
     <span v-if="showValue" class="word-value">{{ guess }}</span>
     <input
       v-else-if="!showSelect"
@@ -140,7 +140,7 @@ function onInputTab(e: KeyboardEvent) {
         </div>
       </div>
     </div>
-    <button type="button" class="word-he" dir="rtl" @click="checkWord">
+    <button type="button" class="word-he" dir="rtl" :disabled="showValue" @click="checkWord">
       {{ word }}
     </button>
 
@@ -211,6 +211,17 @@ function onInputTab(e: KeyboardEvent) {
 .input-hidden .word-input,
 .input-hidden .variation-dropdown {
   display: none;
+}
+/* Translation mode: pair each value tightly with the Hebrew word below it and
+   push rows apart so a value never reads as belonging to the row underneath. */
+.showing-value .word-value {
+  margin-bottom: 0;
+}
+.showing-value .word-he {
+  line-height: 1.1;
+}
+.word-cell.showing-value {
+  margin-bottom: 1rem;
 }
 .variation-dropdown {
   position: relative;
@@ -324,8 +335,11 @@ function onInputTab(e: KeyboardEvent) {
   align-items: flex-start;
   justify-content: center;
 }
-.word-he:hover {
+.word-he:hover:not(:disabled) {
   background: #f0f4ff;
+}
+.word-he:disabled {
+  cursor: default;
 }
 .word-popover {
   position: absolute;
