@@ -71,6 +71,29 @@ Text wrapped in `<small>...</small>` in Sefaria's Hebrew source is **instruction
 
 ---
 
+## Phase 2.5 — Paragraph Translation Drafting & Export (in progress)
+
+Goal: let users compose full-paragraph English translations and export them as a CSV for submission to Sefaria.
+
+### Sefaria write access
+Sefaria's public API is read-only — no API keys are needed for documented endpoints. Write endpoints (`/api/texts/...`) require an internal `apikey` tied to a Sefaria staff account, which is not publicly available. Following Sefaria's own community translation workflow (see [Sefaria Translation Studio](https://github.com/av1m/sefaria-translation-studio)), reviewed translations are exported as a CSV in Sefaria's bulk-import format (`Ref,text`) and emailed to `developers@sefaria.org` for import.
+
+### Design decisions
+- **Local draft → review → export flow**: user drafts in a textarea, reviews against the loaded translation, then exports all drafts as a CSV. Drafts persist in `localStorage`.
+- **CSV format**: `Ref,text` header row, one row per paragraph. Segment refs are 1-indexed: `{sectionRef} {n}` (e.g. `Weekday Siddur Chabad, Shacharit, Upon Arising 1`).
+- **Global export button**: an "Export" button in the action bar downloads all drafts as `siddur-translations.csv`. Shows a count of pending drafts.
+
+### Build steps
+1. `app/composables/useTranslationDrafts.ts` — `localStorage`-backed draft storage keyed by `{ref}::{paragraphIndex}`.
+2. `app/pages/index.vue` — per-paragraph translation editor UI:
+   - "Add Translation" / "Edit Draft" button on each paragraph (visible when `showEnglish` is on).
+   - Opens a `<textarea>` pre-filled with existing translation or draft.
+   - "Review" shows the current translation alongside the draft.
+   - "Export" button in the action bar downloads all drafts as CSV.
+3. Smoke test with `npx nuxt build`.
+
+---
+
 ## Phase 3 — Test Suite (later)
 
 - Build a word list from the full siddur text: every unique Hebrew word appears exactly once.

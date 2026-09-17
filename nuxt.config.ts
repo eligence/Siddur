@@ -9,6 +9,9 @@ export default defineNuxtConfig({
     colorMode: false,
   },
   css: ['~/assets/css/main.css'],
+  runtimeConfig: {
+    sefariaApiKey: '',
+  },
   routeRules: {
     '/': { prerender: true },
     // Sefaria data is already cached (and invalidatable) via useStorage in

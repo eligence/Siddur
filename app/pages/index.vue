@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { TocNode } from '../../shared/types/siddur'
+import type { TocNode } from '~~/shared/types/siddur'
+import type { NavigationMenuItem } from '@nuxt/ui'
 
 const { data: toc, pending: tocPending, error: tocError } = await useSiddurToc()
 const { sections, loading, errors, loadSection } = useSiddurSections()
+const { drafts, getDraft, setDraft, clearDraft, hasDraft } = useTranslationDrafts()
 
-const openKeys = ref<Record<string, boolean>>({})
 const activeRef = ref<string | null>(null)
 // Global toggles in the fixed action bar: 👁 reveals every translation,
 // ✎ reveals every word input.
@@ -16,6 +17,71 @@ let observer: IntersectionObserver | null = null
 
 function wordId(ref: string, paraIndex: number, segIndex: number, wordIndex: number) {
   return `${ref}::${paraIndex}::${segIndex}::${wordIndex}`
+}
+
+// --- Translation editor state ---
+const editingPara = ref<string | null>(null) // `${ref}::${paraIndex}`
+const reviewing = ref(false)
+
+function paraKey(ref: string, paraIndex: number) {
+  return `${ref}::${paraIndex}`
+}
+
+function startEdit(ref: string, paraIndex: number) {
+  const key = paraKey(ref, paraIndex)
+  if (editingPara.value === key) return
+  editingPara.value = key
+  reviewing.value = false
+}
+
+function cancelEdit() {
+  editingPara.value = null
+  reviewing.value = false
+}
+
+function saveDraft(ref: string, paraIndex: number, value: string) {
+  setDraft(ref, paraIndex, value)
+}
+
+function discardDraft(ref: string, paraIndex: number) {
+  clearDraft(ref, paraIndex)
+  cancelEdit()
+}
+
+const draftCount = computed(() =>
+  Object.values(drafts.value).filter((v) => v?.trim()).length,
+)
+
+function csvEscape(value: string): string {
+  if (/["\n,]/.test(value)) return '"' + value.replace(/"/g, '""') + '"'
+  return value
+}
+
+function exportDrafts() {
+  const entries = Object.entries(drafts.value)
+    .filter(([, text]) => text?.trim())
+    .map(([key, text]) => {
+      const sep = key.lastIndexOf('::')
+      const ref = key.slice(0, sep)
+      const paraIndex = Number(key.slice(sep + 2))
+      return { segmentRef: `${ref} ${paraIndex + 1}`, text }
+    })
+    .sort((a, b) => a.segmentRef.localeCompare(b.segmentRef, undefined, { numeric: true }))
+
+  if (!entries.length) return
+
+  const csv = [
+    'Ref,text',
+    ...entries.map((e) => `${csvEscape(e.segmentRef)},${csvEscape(e.text)}`),
+  ].join('\n')
+
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'siddur-translations.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 /** Flatten the TOC tree into an ordered list of leaf (ref, title) entries. */
@@ -68,6 +134,31 @@ function handleSelect(ref: string) {
   })
 }
 
+function buildNavItems(nodes: TocNode[]): NavigationMenuItem[] {
+  return nodes.map((node) => {
+    if (node.children) {
+      return {
+        label: node.title,
+        defaultOpen: true,
+        children: buildNavItems(node.children),
+      }
+    }
+    return {
+      label: node.title,
+      active: activeRef.value === node.ref,
+      onSelect: (e: Event) => {
+        e.preventDefault()
+        if (node.ref) handleSelect(node.ref)
+      },
+    }
+  })
+}
+
+const navItems = computed(() => {
+  if (!toc.value) return []
+  return buildNavItems(toc.value.sections)
+})
+
 /** Observe section elements and set activeRef to the topmost visible section. */
 function setupObserver() {
   if (observer) observer.disconnect()
@@ -94,15 +185,6 @@ function setupObserver() {
   }
 }
 
-/** Scroll the active TOC item into view inside the sidebar. */
-watch(activeRef, (ref) => {
-  if (!ref) return
-  nextTick(() => {
-    const el = document.querySelector(`.toc-leaf.active`) as HTMLElement | null
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-  })
-})
-
 onMounted(() => {
   if (import.meta.client) setupObserver()
 })
@@ -125,12 +207,10 @@ onBeforeUnmount(() => {
           <h1 class="app-title">Weekday Siddur Chabad</h1>
           <p v-if="tocPending">Loading table of contents…</p>
           <p v-else-if="tocError">Failed to load table of contents.</p>
-          <TocTree
+          <UNavigationMenu
             v-else-if="toc"
-            v-model:open-keys="openKeys"
-            :nodes="toc.sections"
-            :active-ref="activeRef"
-            @select="handleSelect"
+            :items="navItems"
+            orientation="vertical"
           />
         </template>
       </UDashboardSidebar>
@@ -162,6 +242,17 @@ onBeforeUnmount(() => {
                 :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
                 @click="showInputs = !showInputs"
               />
+              <UButton
+                icon="i-lucide-download"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                :disabled="draftCount === 0"
+                :title="`Export ${draftCount} draft${draftCount === 1 ? '' : 's'} as CSV for submission to Sefaria`"
+                @click="exportDrafts"
+              >
+                Export{{ draftCount > 0 ? ` (${draftCount})` : '' }}
+              </UButton>
             </template>
           </UDashboardNavbar>
         </template>
@@ -192,6 +283,41 @@ onBeforeUnmount(() => {
             class="paragraph"
           >
             <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
+
+            <!-- Translation editor -->
+            <div v-if="showEnglish" class="translation-editor">
+              <button
+                v-if="editingPara !== paraKey(leaf.ref!, i)"
+                type="button"
+                class="edit-translation-btn"
+                @click="startEdit(leaf.ref!, i)"
+              >
+                {{ hasDraft(leaf.ref!, i) ? '✎ Edit Draft' : '✎ Add Translation' }}
+              </button>
+
+              <div v-if="editingPara === paraKey(leaf.ref!, i)" class="translation-form">
+                <textarea
+                  :value="getDraft(leaf.ref!, i) || para.en || ''"
+                  class="translation-textarea"
+                  placeholder="Enter English translation…"
+                  rows="4"
+                  @input="saveDraft(leaf.ref!, i, ($event.target as HTMLTextAreaElement).value)"
+                />
+                <div class="translation-actions">
+                  <button type="button" class="t-btn t-cancel" @click="cancelEdit">Cancel</button>
+                  <button type="button" class="t-btn t-discard" @click="discardDraft(leaf.ref!, i)">Discard Draft</button>
+                  <button type="button" class="t-btn t-review" @click="reviewing = !reviewing">
+                    {{ reviewing ? 'Hide Review' : 'Review' }}
+                  </button>
+                </div>
+                <div v-if="reviewing" class="translation-review">
+                  <p class="review-label">Current:</p>
+                  <p class="review-current">{{ para.en || '(no existing translation)' }}</p>
+                  <p class="review-label">Draft:</p>
+                  <p class="review-draft">{{ getDraft(leaf.ref!, i) }}</p>
+                </div>
+              </div>
+            </div>
 
             <div class="line-wrap">
               <div class="hebrew-line">
@@ -332,5 +458,89 @@ onBeforeUnmount(() => {
   margin: 0.5rem 0 0;
   text-align: right;
   min-height: var(--english-h);
+}
+.translation-editor {
+  margin: 0.3rem 0 0;
+}
+.edit-translation-btn {
+  font-size: 0.75rem;
+  color: #666;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+}
+.edit-translation-btn:hover {
+  background: #f0f4ff;
+  border-color: #aac;
+}
+.translation-form {
+  margin: 0.5rem 0;
+}
+.translation-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+  direction: ltr;
+  text-align: left;
+  font-family: inherit;
+}
+.translation-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+.t-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f8f8;
+  cursor: pointer;
+}
+.t-btn:hover {
+  background: #f0f4ff;
+}
+.t-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.t-discard {
+  color: #c00;
+  border-color: #eaa;
+}
+.t-discard:hover {
+  background: #fee;
+}
+.translation-review {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8f8f8;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  direction: ltr;
+  text-align: left;
+}
+.review-label {
+  font-weight: 600;
+  margin: 0.3rem 0 0.1rem;
+  color: #888;
+}
+.review-current {
+  margin: 0 0 0.4rem;
+  color: #999;
+  white-space: pre-wrap;
+}
+.review-draft {
+  margin: 0;
+  color: #333;
+  white-space: pre-wrap;
 }
 </style>
