@@ -35,6 +35,12 @@ export interface SiddurTocResponse {
   sections: TocNode[]
 }
 
+export interface QuizWord {
+  key: string
+  word: string
+  count: number
+}
+
 export interface LexiconResult {
   headword: string
   lexicon: string

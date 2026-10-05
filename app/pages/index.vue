@@ -505,6 +505,26 @@ onBeforeUnmount(() => {
               >
                 Export{{ draftCount > 0 ? ` (${draftCount})` : '' }}
               </UButton>
+              <UButton
+                to="/quiz"
+                icon="i-lucide-graduation-cap"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                title="Quiz yourself on siddur words"
+              >
+                Quiz
+              </UButton>
+              <UButton
+                to="/words"
+                icon="i-lucide-list-ordered"
+                color="neutral"
+                variant="outline"
+                size="sm"
+                title="Word list by frequency"
+              >
+                Words
+              </UButton>
               </template>
             </template>
 

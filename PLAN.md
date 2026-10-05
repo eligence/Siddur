@@ -94,12 +94,24 @@ Sefaria's public API is read-only — no API keys are needed for documented endp
 
 ---
 
-## Phase 3 — Test Suite (later)
+## Phase 3 — Test Suite (in progress)
 
 - Build a word list from the full siddur text: every unique Hebrew word appears exactly once.
 - Order the test queue by word frequency, **descending** (most common words tested first).
-- Quiz flow: show Hebrew word → user types English translation → check against lexicon/user's saved answer → track correct/incorrect → move to next word.
+- Quiz flow: show Hebrew word → user types English translation → check against lexicon → track correct/incorrect → move to next word.
 - Track mastery per word across sessions.
+
+### Key rule — one-way sync
+When the user answers a quiz word **correctly**, that answer is added to the word's shared variations pool in `useWordProgress`, so it appears in the siddur display. This does **not** work in the other direction: siddur inputs never count as quiz answers or affect quiz mastery.
+
+### Build steps
+1. `shared/utils/hebrew.ts` — `normalizeHebrewWord()` (consonantal key, shared with word-progress variations) and `cleanHebrewWord()` (edge-punctuation strip for lexicon lookups), used by both client and server.
+2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), picks the most frequent vowelized form for display, sorts by count desc. Cached as `sefaria:wordlist:v1` (not cached if any section fails).
+3. `app/composables/useQuizProgress.ts` — `localStorage` (`siddur:quiz-progress-v1`) per-key `{ correct, incorrect, streak, lastSeen }`. Mastered = streak ≥ `MASTERY_STREAK` (3).
+4. `app/utils/answerMatch.ts` — `matchesLexicon()`: normalized exact match against comma/semicolon-split lexicon glosses, or single-word match inside a short gloss. Stopwords (`to`, `the`, `a`…) and plural `s` ignored.
+5. `app/pages/quiz.vue` — session queue = unmastered words in frequency order. Check → auto-graded result + lexicon definitions; user can override ("I was right" / "Mark incorrect"). Next commits the result (correct → `addVariation`; incorrect → requeued 5 cards later). Skip advances without recording. Enter = Check / Next.
+6. "Quiz" button in the siddur navbar links to `/quiz`.
+7. `app/pages/words.vue` — full word list in frequency order (rank, word, count, quiz streak / mastered badge, saved variations). "Show mastered only" switch filters to mastered words; rank stays the global frequency rank. Linked from the siddur navbar and quiz header.
 
 ---
 
