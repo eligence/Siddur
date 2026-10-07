@@ -12,15 +12,30 @@ const activeRef = ref<string | null>(null)
 // ✎ reveals every word input.
 const showEnglish = ref(false)
 const showInputs = ref(false)
+// Daven mode: plain flowing Hebrew for reading, no word grid/inputs/translations.
+const davenMode = ref(false)
 
-// The two view modes are mutually exclusive.
+// The view modes are mutually exclusive.
 function toggleEnglish() {
   showEnglish.value = !showEnglish.value
-  if (showEnglish.value) showInputs.value = false
+  if (showEnglish.value) {
+    showInputs.value = false
+    davenMode.value = false
+  }
 }
 function toggleInputs() {
   showInputs.value = !showInputs.value
-  if (showInputs.value) showEnglish.value = false
+  if (showInputs.value) {
+    showEnglish.value = false
+    davenMode.value = false
+  }
+}
+function toggleDaven() {
+  davenMode.value = !davenMode.value
+  if (davenMode.value) {
+    showEnglish.value = false
+    showInputs.value = false
+  }
 }
 
 // --- Text style panel ---
@@ -167,6 +182,11 @@ function paraInputsFilled(ref: string, para: SectionParagraph, paraIndex: number
     return seg.words.every((_, wi) => getValue(wordId(ref, paraIndex, si, wi)).trim() !== '')
   })
   return hasWords && allFilled
+}
+
+/** True when the paragraph has prayer text (not just <small> instructions). */
+function hasWords(para: SectionParagraph) {
+  return para.segments.some((seg) => seg.type === 'words' && seg.words.length > 0)
 }
 
 function startEdit(ref: string, paraIndex: number) {
@@ -475,6 +495,16 @@ onBeforeUnmount(() => {
               </USlideover>
               <template v-if="!stylePanelOpen">
               <UButton
+                icon="i-lucide-book-open"
+                color="neutral"
+                :variant="davenMode ? 'solid' : 'outline'"
+                size="sm"
+                :aria-pressed="davenMode"
+                :aria-label="davenMode ? 'Exit daven mode' : 'Daven mode'"
+                :title="davenMode ? 'Exit daven mode' : 'Daven mode — plain Hebrew for reading'"
+                @click="toggleDaven"
+              />
+              <UButton
                 :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
                 color="neutral"
                 variant="outline"
@@ -551,13 +581,14 @@ onBeforeUnmount(() => {
           <p v-if="!sections[leaf.ref!].hasTranslation" class="no-translation-note">
             No English translation is available yet for this section on Sefaria.
           </p>
-          <div
-            v-for="(para, i) in sections[leaf.ref!].paragraphs"
-            :key="i"
-            class="paragraph"
-          >
+          <template v-for="(para, i) in sections[leaf.ref!].paragraphs" :key="i">
+          <!-- Outside daven mode, instruction-only paragraphs are hidden entirely. -->
+          <div v-if="davenMode || hasWords(para)" class="paragraph">
             <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
 
+            <div v-if="davenMode" class="daven-text" dir="rtl" v-html="para.he" />
+
+            <template v-else>
             <!-- Translation editor — only in editing mode (word inputs visible) -->
             <div v-if="showInputs" class="translation-editor">
               <button
@@ -596,8 +627,7 @@ onBeforeUnmount(() => {
             <div class="line-wrap">
               <div class="hebrew-line">
                 <template v-for="(seg, si) in para.segments" :key="si">
-                  <span v-if="seg.type === 'note'" class="note-text" dir="rtl" v-html="seg.html" />
-                  <template v-else>
+                  <template v-if="seg.type === 'words'">
                     <HebrewWord
                       v-for="(word, wi) in seg.words"
                       :key="wi"
@@ -611,7 +641,9 @@ onBeforeUnmount(() => {
                 </template>
               </div>
             </div>
+            </template>
           </div>
+          </template>
         </template>
 
         <p v-else class="status">Not loaded yet…</p>
@@ -739,6 +771,21 @@ onBeforeUnmount(() => {
 }
 .translation-editor {
   margin: 0.3rem 0 0;
+}
+.daven-text {
+  font-family: var(--hebrew-font, inherit);
+  font-size: var(--hebrew-size, 1.5rem);
+  color: var(--hebrew-color, inherit);
+  line-height: 1.9;
+  text-align: justify;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 6rem;
+}
+.daven-text :deep(small) {
+  font-family: var(--note-font, inherit);
+  font-size: var(--note-size, 0.85rem);
+  font-style: italic;
+  color: var(--note-color, #888);
 }
 /* --- Text style panel (Docs-style formatting bar per target) --- */
 .style-section + .style-section {
