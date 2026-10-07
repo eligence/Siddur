@@ -276,33 +276,38 @@ function flattenLeaves(nodes: TocNode[]): TocNode[] {
 
 const leaves = computed(() => (toc.value ? flattenLeaves(toc.value.sections) : []))
 
-/** Load every section's text with a small concurrency cap so we don't hammer the API at once. */
-async function loadAllSections(refs: string[], concurrency = 5) {
-  let cursor = 0
-  async function worker() {
-    while (cursor < refs.length) {
-      const ref = refs[cursor++]
-      await loadSection(ref)
-    }
-  }
-  await Promise.all(Array.from({ length: concurrency }, worker))
+// Lazy loading: a section's text is fetched only when its element comes within
+// ~2 viewports of the scroll position (or when picked in the TOC). Set up after
+// mount, client-side only, so the first client render matches the SSR HTML.
+let stopLoadObservers: (() => void)[] = []
+function setupLoadObservers() {
+  stopLoadObservers.forEach((stop) => stop())
+  stopLoadObservers = leaves.value.flatMap((leaf) => {
+    const el = document.getElementById(sectionElementId(leaf.ref!))
+    if (!el) return []
+    return [
+      observeInView(el, '200% 0px', (entry) => {
+        if (entry.isIntersecting) loadSection(leaf.ref!)
+      }),
+    ]
+  })
 }
 
-// Section text is fetched on-demand rather than via useFetch/useAsyncData, so its
-// timing relative to SSR render is non-deterministic. Only trigger it client-side to
-// avoid hydration mismatches between the SSR HTML and the client's initial render.
-if (import.meta.client) {
-  // Defer to onMounted: an immediate watcher in setup flips loading=true before
-  // hydration, so the client renders "Loading…" over SSR's "Not loaded yet…".
-  onMounted(() => {
-    watch(
-      leaves,
-      (list) => {
-        if (list.length) loadAllSections(list.map((l) => l.ref!))
-      },
-      { immediate: true },
-    )
-  })
+// Virtual scrolling: paragraphs render via VirtualBlock, which swaps off-screen ones
+// for spacers. Measured heights are cached per view mode + column count, since
+// both change a paragraph's height.
+const viewMode = computed(() =>
+  davenMode.value ? 'daven' : showInputs.value ? 'inputs' : showEnglish.value ? 'en' : 'plain',
+)
+function paraCacheKey(ref: string, paraIndex: number) {
+  return `${viewMode.value}:${columnCount.value}:${paraKey(ref, paraIndex)}`
+}
+/** Rough spacer height (px) for a paragraph that hasn't been rendered in this mode yet. */
+function estimateParaHeight(para: SectionParagraph) {
+  const words = para.segments.reduce((n, seg) => n + (seg.type === 'words' ? seg.words.length : 0), 0)
+  if (davenMode.value) return Math.ceil(words / 12) * 46
+  const rows = Math.ceil(words / columnCount.value)
+  return rows * (showInputs.value ? 70 : 46) + (showEnglish.value && para.en ? 48 : 0)
 }
 
 function sectionElementId(ref: string) {
@@ -370,16 +375,25 @@ function setupObserver() {
 }
 
 onMounted(() => {
-  if (import.meta.client) setupObserver()
+  if (import.meta.client) {
+    setupObserver()
+    setupLoadObservers()
+  }
 })
 
 // Sections render asynchronously, so re-observe whenever the leaf list changes.
 if (import.meta.client) {
-  watch(leaves, () => nextTick(() => setupObserver()))
+  watch(leaves, () =>
+    nextTick(() => {
+      setupObserver()
+      setupLoadObservers()
+    }),
+  )
 }
 
 onBeforeUnmount(() => {
   observer?.disconnect()
+  stopLoadObservers.forEach((stop) => stop())
 })
 </script>
 
@@ -406,8 +420,6 @@ onBeforeUnmount(() => {
               <UTooltip text="Toggle sidebar">
                 <UDashboardSidebarCollapse class="hidden lg:flex" />
               </UTooltip>
-            </template>
-            <template #right>
               <USlideover
                 v-model:open="stylePanelOpen"
                 side="right"
@@ -514,6 +526,8 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </USlideover>
+            </template>
+            <template #right>
               <template v-if="!stylePanelOpen">
               <UTooltip :text="davenMode ? 'Exit daven mode' : 'Daven mode — plain Hebrew for reading'">
                 <UButton
@@ -596,6 +610,7 @@ onBeforeUnmount(() => {
             :data-ref="leaf.ref"
             :key="leaf.ref"
             class="prayer-section"
+            :class="{ pending: !sections[leaf.ref!] && !errors[leaf.ref!] }"
           >
         <h2>
           {{ leaf.title }}
@@ -611,7 +626,12 @@ onBeforeUnmount(() => {
           </p>
           <template v-for="(para, i) in sections[leaf.ref!].paragraphs" :key="i">
           <!-- Outside daven mode, instruction-only paragraphs are hidden entirely. -->
-          <div v-if="davenMode || hasWords(para)" class="paragraph">
+          <VirtualBlock
+            v-if="davenMode || hasWords(para)"
+            class="paragraph"
+            :cache-key="paraCacheKey(leaf.ref!, i)"
+            :estimate="estimateParaHeight(para)"
+          >
             <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
 
             <div v-if="davenMode" class="daven-text" dir="rtl" v-html="para.he" />
@@ -670,7 +690,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
             </template>
-          </div>
+          </VirtualBlock>
           </template>
         </template>
 
@@ -721,6 +741,11 @@ onBeforeUnmount(() => {
   margin-bottom: 3rem;
   scroll-margin-top: 1rem;
 }
+/* Unloaded sections reserve a viewport of height so only the few nearest the
+   scroll position fall inside the lazy-load margin at once. */
+.prayer-section.pending {
+  min-height: 100vh;
+}
 .prayer-section h2 {
   display: flex;
   justify-content: space-between;
@@ -760,17 +785,8 @@ onBeforeUnmount(() => {
   align-items: stretch;
   gap: 0 0.2rem;
   direction: rtl;
-  /* The whole siddur (dozens of sections, thousands of words) is rendered at once.
-     Skipping layout/paint for off-screen lines keeps resize/scroll reflow cheap.
-     Paint containment clips overflowing descendants, so a line hosting an open
-     .word-popover drops containment via the :has rule below. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 5rem;
-}
-/* Paint containment clips a .word-popover that overflows the line's box (e.g.
-   on the last row), so a line hosting an open popover must drop containment. */
-.hebrew-line:has(.word-popover) {
-  content-visibility: visible;
+  /* No content-visibility here: VirtualBlock virtualizes paragraphs, and skipped
+     rendering would make it measure placeholder heights instead of real ones. */
 }
 .note-text {
   display: block;
@@ -806,8 +822,6 @@ onBeforeUnmount(() => {
   color: var(--hebrew-color, inherit);
   line-height: 1.9;
   text-align: justify;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 6rem;
 }
 .daven-text :deep(small) {
   font-family: var(--note-font, inherit);

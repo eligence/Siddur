@@ -26,7 +26,11 @@ Goal: fetch the full `Weekday Siddur Chabad` text and arrange it on a single pag
 5. `app/pages/index.vue` — single page layout: TOC sidebar + scrollable content area with lazy-loaded sections.
 6. **Nuxt UI + Tailwind CSS** integrated (`@nuxt/ui` module, `app/assets/css/main.css`, `UApp` wrapper in `app.vue`). Dark mode disabled (`colorMode: false`). Global toggle buttons use `UButton` with Lucide icons.
 7. **Scroll-spy**: `IntersectionObserver` tracks the topmost visible section and updates `activeRef` in the TOC. Active TOC item auto-scrolls into view in the sidebar.
-8. All sections load on mount with a concurrency cap (5 parallel requests).
+8. ~~All sections load on mount with a concurrency cap~~ → replaced by lazy loading + virtual scrolling:
+   - **Lazy loading**: `observeInView()` (`app/composables/useInView.ts`, shared `IntersectionObserver`s rooted at the dashboard panel's scroll container) fetches a section only when it comes within ~2 viewports (`200% 0px`), or when picked in the TOC. Unloaded sections reserve `min-height: 100vh` so only a few nearby ones load at once.
+   - **Virtual scrolling**: each paragraph renders inside `app/components/VirtualBlock.vue`, which mounts its content only within ~1.5 viewports (`150% 0px`) and otherwise renders a spacer at the last measured height (cached per view mode + column count + paragraph in `virtualBlockHeights`), falling back to a word-count estimate. Visibility state is per-block, so scrolling and daven-mode toggles only re-render nearby paragraphs.
+   - `content-visibility: auto` was removed from `.hebrew-line` / `.daven-text`: skipped rendering would make VirtualBlock cache placeholder heights.
+   - Named `VirtualBlock` (not `LazyBlock`) because Nuxt reserves the `Lazy` component prefix.
 
 ---
 
