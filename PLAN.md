@@ -31,6 +31,14 @@ Goal: fetch the full `Weekday Siddur Chabad` text and arrange it on a single pag
    - **Virtual scrolling**: each paragraph renders inside `app/components/VirtualBlock.vue`, which mounts its content only within ~1.5 viewports (`150% 0px`) and otherwise renders a spacer at the last measured height (cached per view mode + column count + paragraph in `virtualBlockHeights`), falling back to a word-count estimate. Visibility state is per-block, so scrolling and daven-mode toggles only re-render nearby paragraphs.
    - `content-visibility: auto` was removed from `.hebrew-line` / `.daven-text`: skipped rendering would make VirtualBlock cache placeholder heights.
    - Named `VirtualBlock` (not `LazyBlock`) because Nuxt reserves the `Lazy` component prefix.
+9. **Pages & pagination**: the single infinite-scroll page was split into one route per top-level TOC node.
+   - `app/utils/toc.ts` — `slugFor`/`sectionPath` (page slugs from node keys), `flattenLeaves`, `sectionElementId` (section DOM id = URL hash), `findTopForLeaf`.
+   - `app/pages/index.vue` — redirects to the first TOC page (`/section/shacharit`); unknown slugs redirect there too.
+   - `app/pages/section/[slug].vue` — renders one top-level node's leaves via `SiddurSections`, plus a prev/next pager and `N / total` position. Group pages show a heading; leaf pages rely on their own section h2.
+   - `app/layouts/siddur.vue` — shared chrome (sidebar nav, navbar, style panel) via `<NuxtLayout>`; sidebar items navigate to `/section/<slug>` and leaf items append `#section-…` hashes (same-page leafs scroll directly).
+   - `app/components/SiddurSections.vue` — section rendering (lazy load + VirtualBlock + peek + translation editor) driven by a `leaves` prop; watches `leaves` since a param-only route change reuses the component. Cross-page anchors: layout sets `scrollTargetRef`, the component scrolls and re-settles as lazy sections above fill in; a wheel/touch gesture cancels the chase.
+   - `app/composables/useSiddurView.ts` — view state (toggles, styles, columns, `activeRef`, `scrollTargetRef`) in `useState` so it survives client-side page navigation; localStorage restore runs once on first mount to keep SSR/first-render consistent.
+   - `scrollParent` exported from `app/composables/useInView.ts` for scroll resets to the panel top.
 
 ---
 

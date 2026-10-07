@@ -9,7 +9,7 @@ const callbacks = new WeakMap<Element, InViewCallback>()
  * the window, and rootMargin only extends the *root* — targets are still clipped
  * by scrolling ancestors — so the panel itself must be the observer root.
  */
-function scrollParent(el: Element): Element | null {
+export function scrollParent(el: Element): Element | null {
   for (let p = el.parentElement; p; p = p.parentElement) {
     if (/(auto|scroll|overlay)/.test(getComputedStyle(p).overflowY)) return p
   }
