@@ -50,7 +50,7 @@ Text wrapped in `<small>...</small>` in Sefaria's Hebrew source is **instruction
 5. `app/composables/useLexicon.ts` — client-side cache + `lookup(word)`; `EDGE_PUNCTUATION` strips all edge punctuation/symbols (including Hebrew-block: maqaf, sof pasuq, geresh) via `\p{P}\p{S}` with the `u` flag.
 6. `app/components/HebrewWord.vue` — renders one word cell: input above the Hebrew word, click-to-toggle popover with lexicon definitions.
 7. `app/pages/index.vue` — paragraphs render `segments`: notes as italic text, words as `HebrewWord` cells. Global `showEnglish` and `showInputs` toggles (fixed `UButton` at viewport bottom-left).
-8. **Daven mode** (book icon in the navbar) — renders each paragraph's raw `he` HTML as plain flowing RTL text for reading (no word grid, inputs, translations or editor); `<small>` notes styled as notes. Outside daven mode, instruction notes are hidden, and instruction-only paragraphs are skipped entirely. Mutually exclusive with the English/inputs views; honors the text style panel's Hebrew/Note settings.
+8. **Daven mode** (book icon in the navbar) — renders each paragraph's raw `he` HTML as plain flowing RTL text for reading (no word grid, inputs, translations or editor); `<small>` notes styled as notes. Outside daven mode, instruction notes are hidden, and instruction-only paragraphs are skipped entirely. Mutually exclusive with the English/inputs views; honors the text style panel's Hebrew/Note settings. State persists in `localStorage` (`siddur:daven-mode`), restored on mount to avoid hydration mismatches.
 
 ### Word progress storage
 - `app/composables/useWordProgress.ts` — two-layer `localStorage`-backed storage (`siddur:word-progress-v3`):

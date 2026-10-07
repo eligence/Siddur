@@ -38,6 +38,24 @@ function toggleDaven() {
   }
 }
 
+// Persist daven mode across refreshes. Restored in onMounted (not setup) so the
+// client's first render matches the SSR HTML, which always starts with it off.
+const DAVEN_STORAGE_KEY = 'siddur:daven-mode'
+onMounted(() => {
+  try {
+    if (localStorage.getItem(DAVEN_STORAGE_KEY) === '1') davenMode.value = true
+  } catch {
+    // ignore inaccessible storage
+  }
+  watch(davenMode, (on) => {
+    try {
+      localStorage.setItem(DAVEN_STORAGE_KEY, on ? '1' : '0')
+    } catch {
+      // ignore quota/access errors
+    }
+  })
+})
+
 // --- Text style panel ---
 const stylePanelOpen = ref(false)
 
