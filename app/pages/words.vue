@@ -55,6 +55,29 @@ const sorted = computed(() => {
 const visible = computed(() =>
   showMasteredOnly.value && !wordsOnly.value ? sorted.value.filter((w) => isMastered(w.key)) : sorted.value,
 )
+
+// When sorted by Word, rows are grouped into collapsible sections by first letter.
+// Otherwise a single untitled, always-open group holds every row.
+const openLetters = ref(new Set<string>())
+function toggleLetter(letter: string) {
+  const next = new Set(openLetters.value)
+  if (next.has(letter)) next.delete(letter)
+  else next.add(letter)
+  openLetters.value = next
+}
+
+const groups = computed(() => {
+  if (sortBy.value !== 'alpha') return [{ letter: '', words: visible.value }]
+  const out: { letter: string; words: typeof visible.value }[] = []
+  for (const w of visible.value) {
+    const letter = alphaKey(w.key)[0]!
+    const last = out[out.length - 1]
+    if (last?.letter === letter) last.words.push(w)
+    else out.push({ letter, words: [w] })
+  }
+  return out
+})
+const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
 </script>
 
 <template>
@@ -116,8 +139,27 @@ const visible = computed(() =>
                 </th>
               </tr>
             </thead>
-            <tbody>
-              <tr v-for="w in visible" :key="w.key" class="word-row border-t border-neutral-100">
+            <tbody v-for="g in groups" :key="g.letter || 'all'">
+              <tr v-if="g.letter" class="border-t border-neutral-200 bg-neutral-50">
+                <th :colspan="columnCount" scope="rowgroup" class="p-0">
+                  <button
+                    type="button"
+                    class="letter-btn"
+                    dir="rtl"
+                    :aria-expanded="openLetters.has(g.letter)"
+                    @click="toggleLetter(g.letter)"
+                  >
+                    <span class="letter-heading">{{ g.letter }}</span>
+                    <span class="text-xs font-normal text-neutral-500">{{ g.words.length }} words</span>
+                    <UIcon
+                      :name="openLetters.has(g.letter) ? 'i-lucide-chevron-down' : 'i-lucide-chevron-left'"
+                      class="ms-auto size-4 text-neutral-500"
+                    />
+                  </button>
+                </th>
+              </tr>
+              <template v-if="!g.letter || openLetters.has(g.letter)">
+              <tr v-for="w in g.words" :key="w.key" class="word-row border-t border-neutral-100">
                 <template v-if="!wordsOnly">
                   <td class="px-3 py-1.5">
                     <UBadge v-if="isMastered(w.key)" color="success" variant="subtle" size="sm">Mastered</UBadge>
@@ -136,6 +178,7 @@ const visible = computed(() =>
                 <td class="px-3 py-1.5 text-right tabular-nums">{{ w.count }}</td>
                 <td class="px-3 py-1.5 text-right tabular-nums text-neutral-400">{{ w.rank }}</td>
               </tr>
+              </template>
             </tbody>
           </table>
         </template>
@@ -167,6 +210,23 @@ const visible = computed(() =>
 .sort-btn.active {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.letter-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+}
+.letter-btn:hover {
+  background: #f0f4ff;
+}
+.letter-heading {
+  font-family: var(--hebrew-font, inherit);
+  font-size: 1.4rem;
+  font-weight: 600;
+  line-height: 1.2;
 }
 /* The full list has thousands of rows; skip layout/paint for off-screen ones. */
 .word-row {
