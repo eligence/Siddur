@@ -119,12 +119,6 @@ const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
                   <th class="px-3 py-2">Streak</th>
                   <th class="px-3 py-2">Your translations</th>
                 </template>
-                <th class="px-3 py-2 text-right" :aria-sort="ariaSort('alpha')">
-                  <button type="button" class="sort-btn" :class="{ active: sortBy === 'alpha' }" title="Sort alphabetically" @click="setSort('alpha')">
-                    Word {{ sortBy === 'alpha' && sortDir === 'desc' ? 'ת–א' : 'א–ת' }}
-                    <UIcon :name="sortIcon('alpha')" class="size-3.5" />
-                  </button>
-                </th>
                 <th class="px-3 py-2 text-right" :aria-sort="ariaSort('count')">
                   <button type="button" class="sort-btn" :class="{ active: sortBy === 'count' }" title="Sort by frequency" @click="setSort('count')">
                     Count
@@ -135,6 +129,12 @@ const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
                   <button type="button" class="sort-btn" :class="{ active: sortBy === 'rank' }" title="Sort by rank" @click="setSort('rank')">
                     #
                     <UIcon :name="sortIcon('rank')" class="size-3.5" />
+                  </button>
+                </th>
+                <th class="px-3 py-2 text-right" :aria-sort="ariaSort('alpha')">
+                  <button type="button" class="sort-btn" :class="{ active: sortBy === 'alpha' }" title="Sort alphabetically" @click="setSort('alpha')">
+                    א–ת
+                    <UIcon :name="sortIcon('alpha')" class="size-3.5" />
                   </button>
                 </th>
               </tr>
@@ -169,14 +169,14 @@ const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
                   </td>
                   <td class="px-3 py-1.5 text-neutral-600">{{ getVariations(w.word).join(', ') }}</td>
                 </template>
+                <td class="px-3 py-1.5 text-right tabular-nums">{{ w.count }}</td>
+                <td class="px-3 py-1.5 text-right tabular-nums text-neutral-400">{{ w.rank }}</td>
                 <td class="px-3 py-1.5 text-right" dir="rtl">
                   <span class="list-word">{{ w.word }}</span>
                   <span v-if="w.forms.length > 1" class="list-forms block text-neutral-400">
                     {{ w.forms.filter((f) => f !== w.word).join(' · ') }}
                   </span>
                 </td>
-                <td class="px-3 py-1.5 text-right tabular-nums">{{ w.count }}</td>
-                <td class="px-3 py-1.5 text-right tabular-nums text-neutral-400">{{ w.rank }}</td>
               </tr>
               </template>
             </tbody>
