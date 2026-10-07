@@ -39,6 +39,8 @@ export interface QuizWord {
   key: string
   word: string
   count: number
+  /** Every vowelized form (incl. prefixed) folded into this entry, most frequent first. */
+  forms: string[]
 }
 
 export interface LexiconResult {

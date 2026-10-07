@@ -27,44 +27,58 @@ async function fetchAllTexts(refs: string[], concurrency = 5) {
 
 export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
-  const cacheKey = 'sefaria:wordlist:v1'
+  const cacheKey = 'sefaria:wordlist:v4'
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
   const index = await fetchSefariaIndex(SIDDUR_TITLE)
   const { texts, failed } = await fetchAllTexts(leafRefs(buildToc(index.schema)))
 
-  const entries = new Map<string, { count: number; forms: Map<string, number> }>()
+  // Pass 1: count every vowelized form and record which bare keys occur on their own.
+  const formCounts = new Map<string, number>()
+  const standaloneKeys = new Set<string>()
   for (const text of texts) {
     for (const para of text.paragraphs) {
       for (const seg of para.segments) {
         if (seg.type !== 'words') continue
-        for (const raw of seg.words) {
+        // A maqaf (־) joins separate words for reading (e.g. עַל֯־פְּנֵי), so count each part.
+        for (const raw of seg.words.flatMap((w) => w.split('\u05BE'))) {
           const form = cleanHebrewWord(raw)
           const key = normalizeHebrewWord(form)
           if (!key) continue
-          let entry = entries.get(key)
-          if (!entry) {
-            entry = { count: 0, forms: new Map() }
-            entries.set(key, entry)
-          }
-          entry.count++
-          entry.forms.set(form, (entry.forms.get(form) ?? 0) + 1)
+          standaloneKeys.add(key)
+          formCounts.set(form, (formCounts.get(form) ?? 0) + 1)
         }
       }
     }
   }
 
-  const result: QuizWord[] = [...entries].map(([key, { count, forms }]) => {
-    let word = ''
-    let best = 0
-    for (const [form, n] of forms) {
-      if (n > best) {
-        word = form
-        best = n
-      }
+  // Pass 2: a leading ו ("and") is always folded. Other prefixes (ב/כ/ל/מ/ה) fold
+  // into the deepest stem that also appears standalone in the siddur — so
+  // וְהַמֶּלֶךְ counts toward מֶלֶךְ, while בָּרוּךְ stays intact because רוּךְ never
+  // occurs on its own.
+  const entries = new Map<string, { count: number; forms: Map<string, number> }>()
+  for (const [form, n] of formCounts) {
+    let key = normalizeHebrewWord(form)
+    const startsWithVav = key.startsWith('ו')
+    hebrewPrefixStems(form).forEach((stem, i) => {
+      const stemKey = normalizeHebrewWord(stem)
+      if (standaloneKeys.has(stemKey) || (i === 0 && startsWithVav)) key = stemKey
+    })
+    let entry = entries.get(key)
+    if (!entry) {
+      entry = { count: 0, forms: new Map() }
+      entries.set(key, entry)
     }
-    return { key, word, count }
+    entry.count += n
+    entry.forms.set(form, n)
+  }
+
+  const result: QuizWord[] = [...entries].map(([key, { count, forms }]) => {
+    const sorted = [...forms].sort((a, b) => b[1] - a[1])
+    // Display the most frequent unprefixed form; fall back to the most frequent overall.
+    const word = (sorted.find(([f]) => normalizeHebrewWord(f) === key) ?? sorted[0]!)[0]
+    return { key, word, count, forms: sorted.map(([f]) => f) }
   })
   result.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
 

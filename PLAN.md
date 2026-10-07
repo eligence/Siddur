@@ -106,7 +106,11 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 
 ### Build steps
 1. `shared/utils/hebrew.ts` — `normalizeHebrewWord()` (consonantal key, shared with word-progress variations) and `cleanHebrewWord()` (edge-punctuation strip for lexicon lookups), used by both client and server.
-2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), picks the most frequent vowelized form for display, sorts by count desc. Cached as `sefaria:wordlist:v1` (not cached if any section fails).
+2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Cached as `sefaria:wordlist:v4` (not cached if any section fails).
+   - **Maqaf (`־`)**: maqaf-joined tokens (e.g. `עַל֯־פְּנֵי`) are split and each word counted separately. The siddur display keeps them as one token.
+   - **Prefix folding (Otiyot HaShimush)**: `hebrewPrefixStems()` in `shared/utils/hebrew.ts` peels formative prefixes in order `ו` → `ב/כ/ל` or `מ` → `ה`, using the pointing rules (e.g. `מִ` + dagesh / `מֵ` before gutturals; `הַ` + dagesh / `הָ` / `הֶ`; `בַּ/לָ` with an absorbed article). A leading `ו` is **always** stripped as "and", with no standalone check. For `ב/כ/ל/מ/ה`, a form is folded into the deepest stem whose key **also occurs standalone** in the siddur — this guards root letters (`בָּרוּךְ` stays intact since `רוך` never appears alone).
+   - Display form = most frequent unprefixed form. `QuizWord.forms` lists all folded forms (shown in `/words`).
+   - Not handled: `שֶׁ` ("that") and future-tense verb prefixes (`א/י/נ/ת`), which change the word rather than add a particle.
 3. `app/composables/useQuizProgress.ts` — `localStorage` (`siddur:quiz-progress-v1`) per-key `{ correct, incorrect, streak, lastSeen }`. Mastered = streak ≥ `MASTERY_STREAK` (3).
 4. `app/utils/answerMatch.ts` — `matchesLexicon()`: normalized exact match against comma/semicolon-split lexicon glosses, or single-word match inside a short gloss. Stopwords (`to`, `the`, `a`…) and plural `s` ignored.
 5. `app/pages/quiz.vue` — session queue = unmastered words in frequency order. Check → auto-graded result + lexicon definitions; user can override ("I was right" / "Mark incorrect"). Next commits the result (correct → `addVariation`; incorrect → requeued 5 cards later). Skip advances without recording. Enter = Check / Next.

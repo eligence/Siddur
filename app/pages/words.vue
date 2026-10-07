@@ -56,7 +56,12 @@ const visible = computed(() =>
             <tbody>
               <tr v-for="w in visible" :key="w.key" class="word-row border-t border-neutral-100">
                 <td class="px-3 py-1.5 text-right tabular-nums text-neutral-400">{{ w.rank }}</td>
-                <td class="list-word px-3 py-1.5 text-right" dir="rtl">{{ w.word }}</td>
+                <td class="px-3 py-1.5 text-right" dir="rtl">
+                  <span class="list-word">{{ w.word }}</span>
+                  <span v-if="w.forms.length > 1" class="list-forms block text-neutral-400">
+                    {{ w.forms.filter((f) => f !== w.word).join(' · ') }}
+                  </span>
+                </td>
                 <td class="px-3 py-1.5 text-right tabular-nums">{{ w.count }}</td>
                 <td class="px-3 py-1.5">
                   <UBadge v-if="isMastered(w.key)" color="success" variant="subtle" size="sm">Mastered</UBadge>
@@ -78,6 +83,10 @@ const visible = computed(() =>
 .list-word {
   font-family: var(--hebrew-font, inherit);
   font-size: 1.25rem;
+}
+.list-forms {
+  font-family: var(--hebrew-font, inherit);
+  font-size: 0.85rem;
 }
 /* The full list has thousands of rows; skip layout/paint for off-screen ones. */
 .word-row {
