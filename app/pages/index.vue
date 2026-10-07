@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { SectionParagraph, TocNode } from '~~/shared/types/siddur'
 import type { NavigationMenuItem } from '@nuxt/ui'
+import { useWordPeek } from '~/composables/useWordPeek'
 
 const { data: toc, pending: tocPending, error: tocError } = await useSiddurToc()
 const { sections, loading, errors, loadSection } = useSiddurSections()
 const { drafts, getDraft, setDraft, clearDraft, hasDraft } = useTranslationDrafts()
-const { getValue } = useWordProgress()
+const { getValue, getVariations } = useWordProgress()
 
 const activeRef = ref<string | null>(null)
 // Global toggles in the fixed action bar: 👁 reveals every translation,
@@ -37,6 +38,27 @@ function toggleDaven() {
     showInputs.value = false
   }
 }
+
+// Daven-mode word peek: long press (mouse) or double-tap-and-hold (touch) a word
+// to show the user's own translation just above it (nothing if they haven't entered one).
+const {
+  peek,
+  close: closePeek,
+  onPointerDown: onPeekDown,
+  onPointerMove: onPeekMove,
+  onPointerEnd: onPeekEnd,
+  onContextMenu: onPeekContextMenu,
+} = useWordPeek()
+watch(davenMode, (on) => {
+  if (!on) closePeek()
+})
+/** User's latest saved translation for the peeked word, or '' if none. */
+const peekTranslation = computed(() => {
+  const p = peek.value
+  if (!p) return ''
+  const vars = getVariations(p.word)
+  return vars[vars.length - 1] ?? ''
+})
 
 // Persist daven mode across refreshes. Restored in onMounted (not setup) so the
 // client's first render matches the SSR HTML, which always starts with it off.
@@ -157,6 +179,38 @@ function onSizePointerCancel(e: PointerEvent) {
 // (The old .content breakpoints are dead CSS — no element has that class —
 // so this is the only thing setting --cols.)
 const columnCount = ref(5)
+
+// Persist text styles + column count across refreshes. Restored in onMounted
+// (like daven mode) so the client's first render matches the SSR HTML.
+const STYLE_STORAGE_KEY = 'siddur:text-styles'
+onMounted(() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STYLE_STORAGE_KEY) ?? 'null')
+    if (saved && typeof saved === 'object') {
+      for (const key of ['hebrew', 'translation', 'note'] as const) {
+        const s = saved.styles?.[key]
+        if (!s) continue
+        if (typeof s.font === 'string') textStyles[key].font = s.font
+        if (typeof s.size === 'number' || s.size === null) textStyles[key].size = s.size
+        if (typeof s.color === 'string' || s.color === null) textStyles[key].color = s.color
+      }
+      if (typeof saved.columns === 'number') columnCount.value = Math.min(12, Math.max(2, saved.columns))
+    }
+  } catch {
+    // ignore inaccessible storage / malformed JSON
+  }
+  watch(
+    [textStyles, columnCount],
+    () => {
+      try {
+        localStorage.setItem(STYLE_STORAGE_KEY, JSON.stringify({ styles: textStyles, columns: columnCount.value }))
+      } catch {
+        // ignore quota/access errors
+      }
+    },
+    { deep: true },
+  )
+})
 
 // 16 words so the preview wraps onto multiple rows like the real word grid.
 const previewWords = 'שְׁמַע יִשְׂרָאֵל יְיָ אֱלֹהֵינוּ יְיָ אֶחָד בָּרוּךְ שֵׁם כְּבוֹד מַלְכוּתוֹ לְעוֹלָם וָעֶד וְאָהַבְתָּ אֵת יְיָ אֱלֹהֶיךָ'.split(' ')
@@ -526,6 +580,31 @@ onBeforeUnmount(() => {
                   </div>
                 </template>
               </USlideover>
+              <!-- Translation/input views only apply to the word grid, not daven mode. -->
+              <template v-if="!davenMode">
+                <UTooltip :text="showEnglish ? 'Hide translations' : 'Show translations'">
+                  <UButton
+                    :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    :aria-pressed="showEnglish"
+                    :aria-label="showEnglish ? 'Hide translations' : 'Show translations'"
+                    @click="toggleEnglish"
+                  />
+                </UTooltip>
+                <UTooltip :text="showInputs ? 'Hide input fields' : 'Show input fields'">
+                  <UButton
+                    :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    :aria-pressed="showInputs"
+                    :aria-label="showInputs ? 'Hide input fields' : 'Show input fields'"
+                    @click="toggleInputs"
+                  />
+                </UTooltip>
+              </template>
             </template>
             <template #right>
               <template v-if="!stylePanelOpen">
@@ -538,28 +617,6 @@ onBeforeUnmount(() => {
                   :aria-pressed="davenMode"
                   :aria-label="davenMode ? 'Exit daven mode' : 'Daven mode'"
                   @click="toggleDaven"
-                />
-              </UTooltip>
-              <UTooltip :text="showEnglish ? 'Hide all translations' : 'Show all translations'">
-                <UButton
-                  :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  :aria-pressed="showEnglish"
-                  :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
-                  @click="toggleEnglish"
-                />
-              </UTooltip>
-              <UTooltip :text="showInputs ? 'Hide all input fields' : 'Show all input fields'">
-                <UButton
-                  :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  :aria-pressed="showInputs"
-                  :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
-                  @click="toggleInputs"
                 />
               </UTooltip>
               <!-- Wrapped in a span: a disabled button doesn't fire the hover
@@ -634,7 +691,17 @@ onBeforeUnmount(() => {
           >
             <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
 
-            <div v-if="davenMode" class="daven-text" dir="rtl" v-html="para.he" />
+            <div
+              v-if="davenMode"
+              class="daven-text"
+              dir="rtl"
+              @pointerdown="onPeekDown"
+              @pointermove="onPeekMove"
+              @pointerup="onPeekEnd"
+              @pointercancel="onPeekEnd"
+              @contextmenu="onPeekContextMenu"
+              v-html="para.he"
+            />
 
             <template v-else>
             <!-- Translation editor — only in editing mode (word inputs visible) -->
@@ -699,6 +766,17 @@ onBeforeUnmount(() => {
         </template>
       </UDashboardPanel>
     </UDashboardGroup>
+    <Teleport to="body">
+      <div
+        v-if="peek && peekTranslation"
+        class="word-peek"
+        :class="{ below: peek.below }"
+        :style="[textStyleVars, { left: `${peek.x}px`, top: `${peek.y}px` }]"
+        role="tooltip"
+      >
+        {{ peekTranslation }}
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -820,8 +898,30 @@ onBeforeUnmount(() => {
   font-family: var(--hebrew-font, inherit);
   font-size: var(--hebrew-size, 1.5rem);
   color: var(--hebrew-color, inherit);
-  line-height: 1.9;
+  line-height: 1;
   text-align: justify;
+  /* Disable double-tap zoom so the second tap of double-tap-and-hold reaches us. */
+  touch-action: manipulation;
+}
+/* Plain text in the Translation text style. Teleported to <body>, outside
+   .layout, so textStyleVars is re-applied inline. The page-colored backdrop
+   keeps it legible over the Hebrew line it overlaps. */
+.word-peek {
+  position: fixed;
+  z-index: 60;
+  max-width: 16rem;
+  padding: 0 0.2rem;
+  background: var(--ui-bg, #fff);
+  font-family: var(--translation-font, inherit);
+  font-size: var(--translation-size, 1rem);
+  color: var(--translation-color, #333);
+  line-height: 1.3;
+  text-align: center;
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 2px));
+}
+.word-peek.below {
+  transform: translate(-50%, 2px);
 }
 .daven-text :deep(small) {
   font-family: var(--note-font, inherit);
