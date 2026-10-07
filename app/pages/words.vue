@@ -8,6 +8,8 @@ const { getVariations } = useWordProgress()
 const showMasteredOnly = ref(false)
 // Hides all personal/quiz UI, leaving just the Word / Count / # table.
 const wordsOnly = ref(false)
+// Off: hide vowelized/prefixed variant lists and show only the normalized (consonantal) key.
+const showVariants = ref(true)
 type SortKey = 'count' | 'alpha' | 'rank'
 type SortDir = 'asc' | 'desc'
 const DEFAULT_DIR: Record<SortKey, SortDir> = { count: 'desc', alpha: 'asc', rank: 'asc' }
@@ -111,6 +113,7 @@ function letterStyle(letter: string) {
             </div>
             <div class="flex flex-wrap items-center gap-4">
               <USwitch v-if="!wordsOnly" v-model="showMasteredOnly" label="Show mastered only" />
+              <USwitch v-model="showVariants" label="Show variants" />
               <USwitch v-model="wordsOnly" label="Words only" />
             </div>
           </div>
@@ -184,8 +187,8 @@ function letterStyle(letter: string) {
                 <td class="px-3 py-1.5 text-right tabular-nums">{{ w.count }}</td>
                 <td class="px-3 py-1.5 text-right tabular-nums text-neutral-400">{{ w.rank }}</td>
                 <td class="px-3 py-1.5 text-right" dir="rtl">
-                  <span class="list-word">{{ w.word }}</span>
-                  <span v-if="w.forms.length > 1" class="list-forms block text-neutral-400">
+                  <span class="list-word">{{ showVariants ? w.word : w.key }}</span>
+                  <span v-if="showVariants && w.forms.length > 1" class="list-forms block text-neutral-400">
                     {{ w.forms.filter((f) => f !== w.word).join(' · ') }}
                   </span>
                 </td>
