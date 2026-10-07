@@ -1,9 +1,11 @@
 export interface WordPeek {
   word: string
-  /** Viewport coords of the anchor point (word's top-center, or bottom-center when `below`). */
-  x: number
-  y: number
-  below: boolean
+  /**
+   * Mount point inside the word's `.peek-anchor` span (the word is wrapped in an
+   * inline-block so a block line rendered here opens space above the line).
+   * Teleport the translation element into it.
+   */
+  mount: HTMLElement
 }
 
 const LONG_PRESS_MS = 450
@@ -15,8 +17,14 @@ const MOVE_TOLERANCE_PX = 8
 const BOUNDARY = /[\s\u05BE]/
 const HEBREW_LETTER = /[\u05D0-\u05EA]/
 
-/** Hebrew word (and its on-screen rect) under a viewport point in plain text, or null. */
-function wordAt(x: number, y: number): { word: string; rect: DOMRect } | null {
+interface WordHit {
+  word: string
+  /** Range spanning exactly the word's characters (inside a single text node). */
+  range: Range
+}
+
+/** Hebrew word (and a Range over it) under a viewport point in plain text, or null. */
+function wordAt(x: number, y: number): WordHit | null {
   const doc = document as Document & {
     caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null
     caretRangeFromPoint?: (x: number, y: number) => Range | null
@@ -48,7 +56,7 @@ function wordAt(x: number, y: number): { word: string; rect: DOMRect } | null {
   const rect = range.getBoundingClientRect()
   // The caret snaps to the nearest position, so confirm the point is actually on the word.
   if (x < rect.left - 2 || x > rect.right + 2 || y < rect.top - 2 || y > rect.bottom + 2) return null
-  return { word, rect }
+  return { word, range }
 }
 
 /**
@@ -58,24 +66,41 @@ function wordAt(x: number, y: number): { word: string; rect: DOMRect } | null {
  * word and its anchor position, and cleared on the next press, scroll, or Escape.
  */
 export function useWordPeek() {
-  const peek = ref<WordPeek | null>(null)
+  const peek = shallowRef<WordPeek | null>(null)
   let timer: ReturnType<typeof setTimeout> | undefined
   let startX = 0
   let startY = 0
   let lastTap: { t: number; x: number; y: number } | null = null
+  let anchor: HTMLElement | null = null
 
   function cancel() {
     clearTimeout(timer)
     timer = undefined
   }
 
+  /** Restore the word's plain text node, dropping the anchor span and mount. */
+  function unwrap() {
+    if (!anchor) return
+    const parent = anchor.parentNode
+    const text = anchor.lastChild // word's text node, after the mount div
+    if (parent && text) {
+      parent.insertBefore(text, anchor)
+      parent.normalize()
+    }
+    anchor.remove()
+    anchor = null
+  }
+
   function close() {
     cancel()
     peek.value = null
+    unwrap()
   }
 
   function onPointerDown(e: PointerEvent) {
     if (e.button !== 0) return
+    const container = (e.target as Element | null)?.closest?.('.daven-text') ?? null
+    if (!container) return
     cancel()
     let delay = LONG_PRESS_MS
     if (e.pointerType === 'touch') {
@@ -96,17 +121,23 @@ export function useWordPeek() {
     timer = setTimeout(() => {
       timer = undefined
       const hit = wordAt(startX, startY)
-      if (!hit) return
+      if (!hit || !container.isConnected) return
       // Drop any selection the browser started during the hold.
       window.getSelection()?.removeAllRanges()
-      const below = hit.rect.top < 56
-      const margin = 80
-      peek.value = {
-        word: hit.word,
-        x: Math.min(Math.max(hit.rect.left + hit.rect.width / 2, margin), window.innerWidth - margin),
-        y: below ? hit.rect.bottom : hit.rect.top,
-        below,
+      // Wrap the word in an inline-block: a block line inside it makes the line
+      // box grow upward, opening space above the line for the translation.
+      const span = document.createElement('span')
+      span.className = 'peek-anchor'
+      try {
+        hit.range.surroundContents(span)
+      } catch {
+        return
       }
+      const mount = document.createElement('div')
+      mount.className = 'peek-mount'
+      span.insertAdjacentElement('afterbegin', mount)
+      anchor = span
+      peek.value = { word: hit.word, mount }
     }, delay)
   }
 
@@ -121,7 +152,7 @@ export function useWordPeek() {
 
   // Any new press (anywhere), scroll, or Escape dismisses the peek.
   function onDocPointerDown() {
-    if (peek.value) peek.value = null
+    if (peek.value) close()
   }
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') close()

@@ -40,7 +40,7 @@ function toggleDaven() {
 }
 
 // Daven-mode word peek: long press (mouse) or double-tap-and-hold (touch) a word
-// to show the user's own translation just above it (nothing if they haven't entered one).
+// to open space above its line showing the user's own translation (nothing if none).
 const {
   peek,
   close: closePeek,
@@ -58,6 +58,11 @@ const peekTranslation = computed(() => {
   if (!p) return ''
   const vars = getVariations(p.word)
   return vars[vars.length - 1] ?? ''
+})
+// A pressed word with no saved translation shows nothing — close the peek so
+// its anchor span is unwrapped again.
+watchEffect(() => {
+  if (peek.value && !peekTranslation.value) closePeek()
 })
 
 // Persist daven mode across refreshes. Restored in onMounted (not setup) so the
@@ -766,16 +771,11 @@ onBeforeUnmount(() => {
         </template>
       </UDashboardPanel>
     </UDashboardGroup>
-    <Teleport to="body">
-      <div
-        v-if="peek && peekTranslation"
-        class="word-peek"
-        :class="{ below: peek.below }"
-        :style="[textStyleVars, { left: `${peek.x}px`, top: `${peek.y}px` }]"
-        role="tooltip"
-      >
-        {{ peekTranslation }}
-      </div>
+    <!-- Teleports into .peek-mount inside the word's anchor span (see
+         useWordPeek): rendered as a block line inside the inline-block anchor,
+         it opens space above the word's line in the text flow. -->
+    <Teleport v-if="peek" :to="peek.mount">
+      <div v-if="peekTranslation" class="word-peek-line" dir="auto">{{ peekTranslation }}</div>
     </Teleport>
   </div>
 </template>
@@ -903,25 +903,30 @@ onBeforeUnmount(() => {
   /* Disable double-tap zoom so the second tap of double-tap-and-hold reaches us. */
   touch-action: manipulation;
 }
-/* Plain text in the Translation text style. Teleported to <body>, outside
-   .layout, so textStyleVars is re-applied inline. The page-colored backdrop
-   keeps it legible over the Hebrew line it overlaps. */
-.word-peek {
-  position: fixed;
-  z-index: 60;
+/* The pressed word is wrapped in .peek-anchor (imperative DOM, so :deep).
+   inline-block + the mount/translation as block lines inside makes the line
+   box grow upward — opening space above the word's line for the translation. */
+.daven-text :deep(.peek-anchor) {
+  display: inline-block;
+}
+/* width:0 + auto margins center a zero-width box on the anchor (= word width);
+   the translation inside sizes to its content and shifts back by half, so it
+   stays centered on the word without widening the line. */
+.daven-text :deep(.peek-mount) {
+  width: 0;
+  margin: 0 auto;
+}
+.word-peek-line {
+  display: block;
+  width: max-content;
   max-width: 16rem;
-  padding: 0 0.2rem;
-  background: var(--ui-bg, #fff);
+  transform: translateX(-50%);
   font-family: var(--translation-font, inherit);
   font-size: var(--translation-size, 1rem);
   color: var(--translation-color, #333);
   line-height: 1.3;
   text-align: center;
   pointer-events: none;
-  transform: translate(-50%, calc(-100% - 2px));
-}
-.word-peek.below {
-  transform: translate(-50%, 2px);
 }
 .daven-text :deep(small) {
   font-family: var(--note-font, inherit);
