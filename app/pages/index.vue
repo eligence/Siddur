@@ -683,9 +683,9 @@ onBeforeUnmount(() => {
         <p v-else-if="errors[leaf.ref!]" class="status error">{{ errors[leaf.ref!] }}</p>
 
         <template v-else-if="sections[leaf.ref!]">
-          <p v-if="!sections[leaf.ref!].hasTranslation" class="no-translation-note">
-            No English translation is available yet for this section on Sefaria.
-          </p>
+<!--          <p v-if="!sections[leaf.ref!].hasTranslation" class="no-translation-note">-->
+<!--            No English translation is available yet for this section on Sefaria.-->
+<!--          </p>-->
           <template v-for="(para, i) in sections[leaf.ref!].paragraphs" :key="i">
           <!-- Outside daven mode, instruction-only paragraphs are hidden entirely. -->
           <VirtualBlock
