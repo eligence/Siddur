@@ -78,6 +78,13 @@ const groups = computed(() => {
   return out
 })
 const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
+
+// Each letter section gets its own hue, stepping evenly around the color wheel from א to ת.
+const LETTERS = 'אבגדהוזחטיכלמנסעפצקרשת'
+function letterStyle(letter: string) {
+  if (!letter) return undefined
+  return { '--letter-hue': String(Math.round((LETTERS.indexOf(letter) * 360) / LETTERS.length)) }
+}
 </script>
 
 <template>
@@ -139,8 +146,13 @@ const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
                 </th>
               </tr>
             </thead>
-            <tbody v-for="g in groups" :key="g.letter || 'all'">
-              <tr v-if="g.letter" class="border-t border-neutral-200 bg-neutral-50">
+            <tbody
+              v-for="g in groups"
+              :key="g.letter || 'all'"
+              :class="{ 'letter-group': g.letter }"
+              :style="letterStyle(g.letter)"
+            >
+              <tr v-if="g.letter" class="letter-row border-t border-neutral-200">
                 <th :colspan="columnCount" scope="rowgroup" class="p-0">
                   <button
                     type="button"
@@ -219,8 +231,14 @@ const columnCount = computed(() => (wordsOnly.value ? 3 : 5))
   padding: 0.4rem 0.75rem;
   cursor: pointer;
 }
+.letter-group .word-row {
+  background: hsl(var(--letter-hue) 70% 50% / 0.06);
+}
+.letter-group .letter-row {
+  background: hsl(var(--letter-hue) 70% 50% / 0.16);
+}
 .letter-btn:hover {
-  background: #f0f4ff;
+  background: hsl(var(--letter-hue) 70% 50% / 0.1);
 }
 .letter-heading {
   font-family: var(--hebrew-font, inherit);
