@@ -1,6 +1,7 @@
 /** Strip Hebrew/English punctuation so words like בְּרֵאשִׁית and בְּרֵאשִׁית, share the same key. */
 export function normalizeHebrewWord(word: string): string {
-  return word.replace(/[^\p{L}\p{N}]/gu, '')
+  // NFKD splits presentation forms (e.g. בּ U+FB31) into base letter + mark.
+  return word.normalize('NFKD').replace(/[^\p{L}\p{N}]/gu, '')
 }
 
 // Trim leading/trailing punctuation and symbols — including Hebrew-block punctuation

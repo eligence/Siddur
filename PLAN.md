@@ -106,7 +106,8 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 
 ### Build steps
 1. `shared/utils/hebrew.ts` — `normalizeHebrewWord()` (consonantal key, shared with word-progress variations) and `cleanHebrewWord()` (edge-punctuation strip for lexicon lookups), used by both client and server.
-2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Cached as `sefaria:wordlist:v4` (not cached if any section fails).
+2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Cached as `sefaria:wordlist:v5` (not cached if any section fails).
+   - **Hebrew only**: tokens whose key isn't purely Hebrew letters (e.g. Omer day numbers `1`–`49`) are skipped. Forms are NFC-normalized and `normalizeHebrewWord()` applies NFKD, so presentation-form letters (e.g. `בּ` U+FB31) key the same as base letters.
    - **Maqaf (`־`)**: maqaf-joined tokens (e.g. `עַל֯־פְּנֵי`) are split and each word counted separately. The siddur display keeps them as one token.
    - **Prefix folding (Otiyot HaShimush)**: `hebrewPrefixStems()` in `shared/utils/hebrew.ts` peels formative prefixes in order `ו` → `ב/כ/ל` or `מ` → `ה`, using the pointing rules (e.g. `מִ` + dagesh / `מֵ` before gutturals; `הַ` + dagesh / `הָ` / `הֶ`; `בַּ/לָ` with an absorbed article). A leading `ו` is **always** stripped as "and", with no standalone check. For `ב/כ/ל/מ/ה`, a form is folded into the deepest stem whose key **also occurs standalone** in the siddur — this guards root letters (`בָּרוּךְ` stays intact since `רוך` never appears alone).
    - Display form = most frequent unprefixed form. `QuizWord.forms` lists all folded forms (shown in `/words`).
@@ -115,7 +116,7 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 4. `app/utils/answerMatch.ts` — `matchesLexicon()`: normalized exact match against comma/semicolon-split lexicon glosses, or single-word match inside a short gloss. Stopwords (`to`, `the`, `a`…) and plural `s` ignored.
 5. `app/pages/quiz.vue` — session queue = unmastered words in frequency order. Check → auto-graded result + lexicon definitions; user can override ("I was right" / "Mark incorrect"). Next commits the result (correct → `addVariation`; incorrect → requeued 5 cards later). Skip advances without recording. Enter = Check / Next.
 6. "Quiz" button in the siddur navbar links to `/quiz`.
-7. `app/pages/words.vue` — full word list in frequency order (rank, word, count, quiz streak / mastered badge, saved variations). "Show mastered only" switch filters to mastered words; rank stays the global frequency rank. Linked from the siddur navbar and quiz header.
+7. `app/pages/words.vue` — full word list in frequency order (rank, word, count, quiz streak / mastered badge, saved variations). "Show mastered only" switch filters to mastered words; rank stays the global frequency rank. Clickable "Word א–ת" / "Count" / "#" headers toggle Hebrew alphabetical order (by consonantal stem key, final letters ך ם ן ף ץ sorted as their regular forms) vs. frequency; chevrons show direction and clicking the active header flips it. A "Words only" switch hides all personal/quiz UI (streak, translations, mastered badge/filter, Quiz link), leaving just Word / Count / #. Linked from the siddur navbar and quiz header.
 
 ---
 

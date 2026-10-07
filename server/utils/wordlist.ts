@@ -27,7 +27,7 @@ async function fetchAllTexts(refs: string[], concurrency = 5) {
 
 export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
-  const cacheKey = 'sefaria:wordlist:v4'
+  const cacheKey = 'sefaria:wordlist:v5'
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
@@ -43,9 +43,11 @@ export async function buildWordList(): Promise<QuizWord[]> {
         if (seg.type !== 'words') continue
         // A maqaf (־) joins separate words for reading (e.g. עַל֯־פְּנֵי), so count each part.
         for (const raw of seg.words.flatMap((w) => w.split('\u05BE'))) {
-          const form = cleanHebrewWord(raw)
+          // NFC decomposes presentation forms so prefix detection sees base letters.
+          const form = cleanHebrewWord(raw).normalize('NFC')
           const key = normalizeHebrewWord(form)
-          if (!key) continue
+          // Skip non-Hebrew tokens (e.g. Omer day numbers).
+          if (!/^[\u05D0-\u05EA]+$/.test(key)) continue
           standaloneKeys.add(key)
           formCounts.set(form, (formCounts.get(form) ?? 0) + 1)
         }
