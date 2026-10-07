@@ -403,7 +403,9 @@ onBeforeUnmount(() => {
         <template #header>
           <UDashboardNavbar>
             <template #left>
-              <UDashboardSidebarCollapse class="hidden lg:flex" />
+              <UTooltip text="Toggle sidebar">
+                <UDashboardSidebarCollapse class="hidden lg:flex" />
+              </UTooltip>
             </template>
             <template #right>
               <USlideover
@@ -414,15 +416,16 @@ onBeforeUnmount(() => {
               >
                 <!-- Default slot is the trigger — Reka coordinates it with the
                      outside-click dismiss so toggling can't reopen the panel. -->
-                <UButton
-                  icon="tabler:typography"
-                  color="neutral"
-                  variant="outline"
-                  size="sm"
-                  :aria-pressed="stylePanelOpen"
-                  aria-label="Text style settings"
-                  title="Text style settings"
-                />
+                <UTooltip text="Text style settings">
+                  <UButton
+                    icon="tabler:typography"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    :aria-pressed="stylePanelOpen"
+                    aria-label="Text style settings"
+                  />
+                </UTooltip>
                 <!-- Explicit close: sets stylePanelOpen directly rather than
                      relying on the update:open emit. -->
                 <template #close>
@@ -512,67 +515,74 @@ onBeforeUnmount(() => {
                 </template>
               </USlideover>
               <template v-if="!stylePanelOpen">
-              <UButton
-                icon="i-lucide-book-open"
-                color="neutral"
-                :variant="davenMode ? 'solid' : 'outline'"
-                size="sm"
-                :aria-pressed="davenMode"
-                :aria-label="davenMode ? 'Exit daven mode' : 'Daven mode'"
-                :title="davenMode ? 'Exit daven mode' : 'Daven mode — plain Hebrew for reading'"
-                @click="toggleDaven"
-              />
-              <UButton
-                :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                :aria-pressed="showEnglish"
-                :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
-                :title="showEnglish ? 'Hide all translations' : 'Show all translations'"
-                @click="toggleEnglish"
-              />
-              <UButton
-                :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                :aria-pressed="showInputs"
-                :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
-                :title="showInputs ? 'Hide all input fields' : 'Show all input fields'"
-                @click="toggleInputs"
-              />
-              <UButton
-                icon="i-lucide-download"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                :disabled="draftCount === 0"
-                :title="`Export ${draftCount} draft${draftCount === 1 ? '' : 's'} as CSV for submission to Sefaria`"
-                @click="exportDrafts"
-              >
-                Export{{ draftCount > 0 ? ` (${draftCount})` : '' }}
-              </UButton>
-              <UButton
-                to="/quiz"
-                icon="i-lucide-graduation-cap"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                title="Quiz yourself on siddur words"
-              >
-                Quiz
-              </UButton>
-              <UButton
-                to="/words"
-                icon="i-lucide-list-ordered"
-                color="neutral"
-                variant="outline"
-                size="sm"
-                title="Word list by frequency"
-              >
-                Words
-              </UButton>
+              <UTooltip :text="davenMode ? 'Exit daven mode' : 'Daven mode — plain Hebrew for reading'">
+                <UButton
+                  icon="i-lucide-book-open"
+                  color="neutral"
+                  :variant="davenMode ? 'solid' : 'outline'"
+                  size="sm"
+                  :aria-pressed="davenMode"
+                  :aria-label="davenMode ? 'Exit daven mode' : 'Daven mode'"
+                  @click="toggleDaven"
+                />
+              </UTooltip>
+              <UTooltip :text="showEnglish ? 'Hide all translations' : 'Show all translations'">
+                <UButton
+                  :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  :aria-pressed="showEnglish"
+                  :aria-label="showEnglish ? 'Hide all translations' : 'Show all translations'"
+                  @click="toggleEnglish"
+                />
+              </UTooltip>
+              <UTooltip :text="showInputs ? 'Hide all input fields' : 'Show all input fields'">
+                <UButton
+                  :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  :aria-pressed="showInputs"
+                  :aria-label="showInputs ? 'Hide all input fields' : 'Show all input fields'"
+                  @click="toggleInputs"
+                />
+              </UTooltip>
+              <!-- Wrapped in a span: a disabled button doesn't fire the hover
+                   events the tooltip needs. -->
+              <UTooltip :text="`Export${draftCount > 0 ? ` (${draftCount})` : ''}`">
+                <span class="inline-flex">
+                  <UButton
+                    icon="i-lucide-download"
+                    color="neutral"
+                    variant="outline"
+                    size="sm"
+                    :disabled="draftCount === 0"
+                    :aria-label="`Export ${draftCount} draft${draftCount === 1 ? '' : 's'} as CSV`"
+                    @click="exportDrafts"
+                  />
+                </span>
+              </UTooltip>
+              <UTooltip text="Quiz">
+                <UButton
+                  to="/quiz"
+                  icon="i-lucide-graduation-cap"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  aria-label="Quiz"
+                />
+              </UTooltip>
+              <UTooltip text="Words">
+                <UButton
+                  to="/words"
+                  icon="i-lucide-list-ordered"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  aria-label="Words"
+                />
+              </UTooltip>
               </template>
             </template>
 
