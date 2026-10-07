@@ -27,7 +27,7 @@ async function fetchAllTexts(refs: string[], concurrency = 5) {
 
 export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
-  const cacheKey = 'sefaria:wordlist:v5'
+  const cacheKey = 'sefaria:wordlist:v6'
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
