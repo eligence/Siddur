@@ -3,7 +3,7 @@ import type { SectionParagraph, TocNode } from '~~/shared/types/siddur'
 import { scrollParent } from '~/composables/useInView'
 import { useWordPeek } from '~/composables/useWordPeek'
 
-/** Renders one top-level TOC node's leaf sections (the body of a /section/<slug> page). */
+/** Renders one top-level TOC node's leaf sections (the body of a /siddur/<slug> page). */
 const props = defineProps<{ leaves: TocNode[] }>()
 
 const { sections, loading, errors, loadSection } = useSiddurSections()

@@ -14,7 +14,7 @@ export const defaultSizes: Record<StyleKey, number> = { hebrew: 21, translation:
 /**
  * Shared siddur view state — view-mode toggles, text styles, the section under
  * the viewport top, and the pending scroll target — persisted via useState so
- * it survives client-side navigation between /section/<slug> pages.
+ * it survives client-side navigation between /siddur/<slug> pages.
  * localStorage restore runs once on first mount so the client's first render
  * still matches the SSR HTML (everything starts at defaults).
  */

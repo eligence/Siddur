@@ -191,7 +191,10 @@ function exportDrafts() {
 <template>
   <div class="layout" :style="textStyleVars">
     <UDashboardGroup>
-      <UDashboardSidebar v-model:open="sidebarOpen" collapsible :collapsed-size="0" :ui="{ root: 'min-w-0 z-50' }">
+      <!-- Width transition = the desktop counterpart to the slideover's
+           slide-in-from-left animation used on mobile. overflow-x-clip keeps
+           the nav from spilling over the panel while the width animates. -->
+      <UDashboardSidebar v-model:open="sidebarOpen" collapsible :collapsed-size="0" :ui="{ root: 'min-w-0 z-50 overflow-x-clip transition-[width] duration-200 ease-out motion-reduce:transition-none' }">
         <template #default>
           <h1 class="app-title">Weekday Siddur Chabad</h1>
           <p v-if="tocPending">Loading table of contents…</p>

@@ -1,6 +1,6 @@
 import type { TocNode } from '../../shared/types/siddur'
 
-/** URL slug for a top-level TOC node's page (`/section/<slug>`). */
+/** URL slug for a top-level TOC node's page (`/siddur/<slug>`). */
 export function slugFor(key: string) {
   return key
     .toLowerCase()
@@ -11,7 +11,7 @@ export function slugFor(key: string) {
 
 /** Route path of a top-level TOC node's page. */
 export function sectionPath(title: string) {
-  return `/section/${slugFor(title)}`
+  return `/siddur/${slugFor(title)}`
 }
 
 /** Flatten the TOC tree into an ordered list of leaf (ref-bearing) entries. */
