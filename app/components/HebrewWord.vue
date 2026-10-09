@@ -5,6 +5,10 @@ const props = defineProps<{
   showInput: boolean
   /** Translation view: render the guess as read-only text instead of an input. */
   showValue?: boolean
+  /** Daven mode: cell shrink-wraps to the Hebrew word's width. */
+  daven?: boolean
+  /** Hold-to-reveal: show just this word's translation while the press is held. */
+  revealed?: boolean
   sentenceStart?: boolean
 }>()
 
@@ -70,6 +74,8 @@ function submitNewValue() {
 }
 
 function checkWord() {
+  // Daven mode: presses reveal the translation cell instead of the dictionary.
+  if (props.daven) return
   toggle(props.id)
   if (isOpen(props.id)) lookup(props.word)
 }
@@ -86,8 +92,12 @@ function onInputTab(e: KeyboardEvent) {
 </script>
 
 <template>
-  <span class="word-cell" :class="{ 'input-hidden': !showInput && !showValue, 'showing-value': showValue }">
-    <span v-if="showValue" class="word-value">{{ guess }}</span>
+  <span
+    class="word-cell"
+    :class="{ 'input-hidden': !showInput && !showValue, 'showing-value': showValue, 'daven-cell': daven, revealed }"
+    :data-word-id="daven ? id : undefined"
+  >
+    <span v-if="showValue || (revealed && guess)" class="word-value">{{ guess }}</span>
     <input
       v-else-if="!showSelect"
       v-model="guess"
@@ -223,6 +233,43 @@ function onInputTab(e: KeyboardEvent) {
 }
 .word-cell.showing-value {
   margin-bottom: 1rem;
+}
+/* --- Daven mode: cells collapse to the Hebrew word's width (no even
+   columns). The width:0 + min-width:100% trick lets .word-value wrap
+   vertically inside that width without widening the cell. --- */
+.word-cell.daven-cell {
+  flex: 0 0 auto;
+}
+.daven-cell .word-value {
+  position: relative;
+  width: 0;
+  min-width: 100%;
+  height: auto;
+  padding: 0.1rem 0;
+  align-items: flex-start;
+  white-space: normal;
+  overflow-wrap: break-word;
+  overflow: visible;
+  line-height: 1.3;
+}
+/* Margin dot at the left of each translation, in the translation's color. */
+.daven-cell .word-value::before {
+  content: '';
+  position: absolute;
+  left: -0.55rem;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.daven-cell .word-he {
+  flex: 0 0 auto;
+  /* Long-press friendly: no double-tap zoom, no callout, no text selection. */
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .variation-dropdown {
   position: relative;

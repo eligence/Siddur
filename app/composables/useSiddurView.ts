@@ -38,13 +38,11 @@ export function useSiddurView() {
   // Element id a nav selection should scroll to after the target page mounts.
   const scrollTargetRef = useState<string | null>('siddur-view:scroll-target', () => null)
 
-  // The view modes are mutually exclusive.
+  // Inputs stay exclusive with both reading modes; english translations can be
+  // toggled on top of daven mode.
   function toggleEnglish() {
     showEnglish.value = !showEnglish.value
-    if (showEnglish.value) {
-      showInputs.value = false
-      davenMode.value = false
-    }
+    if (showEnglish.value) showInputs.value = false
   }
   function toggleInputs() {
     showInputs.value = !showInputs.value
@@ -55,10 +53,7 @@ export function useSiddurView() {
   }
   function toggleDaven() {
     davenMode.value = !davenMode.value
-    if (davenMode.value) {
-      showEnglish.value = false
-      showInputs.value = false
-    }
+    if (davenMode.value) showInputs.value = false
   }
 
   function stepSize(key: StyleKey, delta: number) {

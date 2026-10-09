@@ -8,7 +8,7 @@ const props = defineProps<{ leaves: TocNode[] }>()
 
 const { sections, loading, errors, loadSection } = useSiddurSections()
 const { getDraft, setDraft, clearDraft, hasDraft } = useTranslationDrafts()
-const { getValue, getVariations } = useWordProgress()
+const { getValue } = useWordProgress()
 const {
   showEnglish,
   showInputs,
@@ -71,37 +71,32 @@ function discardDraft(ref: string, paraIndex: number) {
   cancelEdit()
 }
 
-// Daven-mode word peek: long press (mouse) or double-tap-and-hold (touch) a word
-// to open space above its line showing the user's own translation (nothing if none).
+// Daven-mode word peek: while translations are hidden, tapping a word cell
+// toggles its translation; holding reveals it for the duration of the press.
+const canPeek = computed(() => davenMode.value && !showEnglish.value)
 const {
-  peek,
+  peekId,
   close: closePeek,
   onPointerDown: onPeekDown,
-  onPointerMove: onPeekMove,
-  onPointerEnd: onPeekEnd,
   onContextMenu: onPeekContextMenu,
-} = useWordPeek()
-watch(davenMode, (on) => {
+} = useWordPeek(canPeek)
+watch(canPeek, (on) => {
   if (!on) closePeek()
-})
-/** User's latest saved translation for the peeked word, or '' if none. */
-const peekTranslation = computed(() => {
-  const p = peek.value
-  if (!p) return ''
-  const vars = getVariations(p.word)
-  return vars[vars.length - 1] ?? ''
-})
-// A pressed word with no saved translation shows nothing — close the peek so
-// its anchor span is unwrapped again.
-watchEffect(() => {
-  if (peek.value && !peekTranslation.value) closePeek()
 })
 
 // Virtual scrolling: paragraphs render via VirtualBlock, which swaps off-screen ones
 // for spacers. Measured heights are cached per view mode + column count, since
 // both change a paragraph's height.
 const viewMode = computed(() =>
-  davenMode.value ? 'daven' : showInputs.value ? 'inputs' : showEnglish.value ? 'en' : 'plain',
+  davenMode.value
+    ? showEnglish.value
+      ? 'daven-en'
+      : 'daven'
+    : showInputs.value
+      ? 'inputs'
+      : showEnglish.value
+        ? 'en'
+        : 'plain',
 )
 function paraCacheKey(ref: string, paraIndex: number) {
   return `${viewMode.value}:${columnCount.value}:${paraKey(ref, paraIndex)}`
@@ -109,7 +104,8 @@ function paraCacheKey(ref: string, paraIndex: number) {
 /** Rough spacer height (px) for a paragraph that hasn't been rendered in this mode yet. */
 function estimateParaHeight(para: SectionParagraph) {
   const words = para.segments.reduce((n, seg) => n + (seg.type === 'words' ? seg.words.length : 0), 0)
-  if (davenMode.value) return Math.ceil(words / 12) * 46
+  // Daven cells shrink-wrap to word width (~8 per row); translations grow rows.
+  if (davenMode.value) return Math.ceil(words / 8) * (showEnglish.value ? 90 : 50) + 24
   const rows = Math.ceil(words / columnCount.value)
   return rows * (showInputs.value ? 70 : 46) + (showEnglish.value && para.en ? 48 : 0)
 }
@@ -255,19 +251,6 @@ onBeforeUnmount(() => {
         >
           <span v-if="para.en && showEnglish" class="english" v-html="para.en" />
 
-          <div
-            v-if="davenMode"
-            class="daven-text"
-            dir="rtl"
-            @pointerdown="onPeekDown"
-            @pointermove="onPeekMove"
-            @pointerup="onPeekEnd"
-            @pointercancel="onPeekEnd"
-            @contextmenu="onPeekContextMenu"
-            v-html="para.he"
-          />
-
-          <template v-else>
           <!-- Translation editor — only in editing mode (word inputs visible) -->
           <div v-if="showInputs" class="translation-editor">
             <button
@@ -304,9 +287,16 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="line-wrap">
-            <div class="hebrew-line">
+            <div
+              class="hebrew-line"
+              :class="{ daven: davenMode }"
+              @pointerdown="onPeekDown"
+              @contextmenu="onPeekContextMenu"
+            >
               <template v-for="(seg, si) in para.segments" :key="si">
-                <template v-if="seg.type === 'words'">
+                <!-- Instruction segments render in daven mode only. -->
+                <span v-if="seg.type === 'note' && davenMode" class="note-text" v-html="seg.html" />
+                <template v-else-if="seg.type === 'words'">
                   <HebrewWord
                     v-for="(word, wi) in seg.words"
                     :key="wi"
@@ -314,26 +304,20 @@ onBeforeUnmount(() => {
                     :word="word"
                     :show-input="showInputs"
                     :show-value="showEnglish"
+                    :daven="davenMode"
+                    :revealed="peekId === wordId(leaf.ref!, i, si, wi)"
                     :sentence-start="wi === 0"
                   />
                 </template>
               </template>
             </div>
           </div>
-          </template>
         </VirtualBlock>
         </template>
       </template>
 
       <p v-else class="status">Not loaded yet…</p>
     </section>
-
-    <!-- Teleports into .peek-mount inside the word's anchor span (see
-         useWordPeek): rendered as a block line inside the inline-block anchor,
-         it opens space above the word's line in the text flow. -->
-    <Teleport v-if="peek" :to="peek.mount">
-      <div v-if="peekTranslation" class="word-peek-line" dir="auto">{{ peekTranslation }}</div>
-    </Teleport>
   </div>
 </template>
 
@@ -389,6 +373,11 @@ onBeforeUnmount(() => {
   /* No content-visibility here: VirtualBlock virtualizes paragraphs, and skipped
     rendering would make it measure placeholder heights instead of real ones. */
 }
+/* Daven mode: cells shrink-wrap to word width; a wider gap leaves room for
+   the margin dots sitting at the left of each translation. */
+.hebrew-line.daven {
+  column-gap: 0.85rem;
+}
 .note-text {
   display: block;
   flex-basis: 100%;
@@ -416,46 +405,6 @@ onBeforeUnmount(() => {
 }
 .translation-editor {
   margin: 0.3rem 0 0;
-}
-.daven-text {
-  font-family: var(--hebrew-font, inherit);
-  font-size: var(--hebrew-size, 1.5rem);
-  color: var(--hebrew-color, inherit);
-  line-height: 1;
-  text-align: justify;
-  /* Disable double-tap zoom so the second tap of double-tap-and-hold reaches us. */
-  touch-action: manipulation;
-}
-/* The pressed word is wrapped in .peek-anchor (imperative DOM, so :deep).
-   inline-block + the mount/translation as block lines inside makes the line
-   box grow upward — opening space above the word's line for the translation. */
-.daven-text :deep(.peek-anchor) {
-  display: inline-block;
-}
-/* width:0 + auto margins center a zero-width box on the anchor (= word width);
-   the translation inside sizes to its content and shifts back by half, so it
-   stays centered on the word without widening the line. */
-.daven-text :deep(.peek-mount) {
-  width: 0;
-  margin: 0 auto;
-}
-.word-peek-line {
-  display: block;
-  width: max-content;
-  max-width: 16rem;
-  transform: translateX(-50%);
-  font-family: var(--translation-font, inherit);
-  font-size: var(--translation-size, 1rem);
-  color: var(--translation-color, #333);
-  line-height: 1.3;
-  text-align: center;
-  pointer-events: none;
-}
-.daven-text :deep(small) {
-  font-family: var(--note-font, inherit);
-  font-size: var(--note-size, 0.85rem);
-  font-style: italic;
-  color: var(--note-color, #888);
 }
 .edit-translation-btn {
   font-size: 0.75rem;

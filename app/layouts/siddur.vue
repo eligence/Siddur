@@ -320,19 +320,19 @@ function exportDrafts() {
                   </div>
                 </template>
               </USlideover>
-              <!-- Translation/input views only apply to the word grid, not daven mode. -->
+              <!-- Translations can be toggled in daven mode too; word inputs can't. -->
+              <UTooltip :text="showEnglish ? 'Hide translations' : 'Show translations'">
+                <UButton
+                  :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
+                  color="neutral"
+                  variant="outline"
+                  size="sm"
+                  :aria-pressed="showEnglish"
+                  :aria-label="showEnglish ? 'Hide translations' : 'Show translations'"
+                  @click="toggleEnglish"
+                />
+              </UTooltip>
               <template v-if="!davenMode">
-                <UTooltip :text="showEnglish ? 'Hide translations' : 'Show translations'">
-                  <UButton
-                    :icon="showEnglish ? 'tabler:letter-a' : 'tabler:alphabet-hebrew'"
-                    color="neutral"
-                    variant="outline"
-                    size="sm"
-                    :aria-pressed="showEnglish"
-                    :aria-label="showEnglish ? 'Hide translations' : 'Show translations'"
-                    @click="toggleEnglish"
-                  />
-                </UTooltip>
                 <UTooltip :text="showInputs ? 'Hide input fields' : 'Show input fields'">
                   <UButton
                     :icon="showInputs ? 'i-lucide-pencil' : 'i-lucide-pencil-off'"
