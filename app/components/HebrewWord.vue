@@ -97,7 +97,7 @@ function onInputTab(e: KeyboardEvent) {
     :class="{ 'input-hidden': !showInput && !showValue, 'showing-value': showValue, 'daven-cell': daven, revealed }"
     :data-word-id="daven ? id : undefined"
   >
-    <span v-if="showValue || (revealed && guess)" class="word-value">{{ guess }}</span>
+    <span v-if="showValue || (revealed && guess)" class="word-value" :class="{ 'is-empty': !guess }">{{ guess }}</span>
     <input
       v-else-if="!showSelect"
       v-model="guess"
@@ -239,29 +239,61 @@ function onInputTab(e: KeyboardEvent) {
    vertically inside that width without widening the cell. --- */
 .word-cell.daven-cell {
   flex: 0 0 auto;
+  /* Anchor the Hebrew to the cell bottom so every .word-he in a row sits on
+     the same line no matter how tall the translation above it grows. */
+  justify-content: flex-end;
 }
 .daven-cell .word-value {
   position: relative;
   width: 0;
   min-width: 100%;
+  box-sizing: border-box;
   height: auto;
-  padding: 0.1rem 0;
+  /* Left padding reserves space for the margin dot inside the box. */
+  padding: 0.1rem 0 0.1rem 0.55rem;
   align-items: flex-start;
   white-space: normal;
   overflow-wrap: break-word;
   overflow: visible;
   line-height: 1.3;
+  /* Zero intrinsic width: the cell sizes to .word-he alone, never the value. */
+  contain: inline-size;
 }
-/* Margin dot at the left of each translation, in the translation's color. */
+/* Peeked translation floats above the cell — absolutely positioned so the
+   Hebrew word never moves when it opens. */
+.daven-cell.revealed .word-value {
+  /* Restore normal intrinsic sizing so width:max-content can grow it. */
+  contain: none;
+  padding-left: 0;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  min-width: 100%;
+  max-width: 14rem;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+}
+/* Peeked translation is a floating overlay — no margin dot. */
+.daven-cell.revealed .word-value::before {
+  content: none;
+}
+/* Margin dot at the left of each translation, in the translation's color —
+   inside the value's reserved left padding. */
 .daven-cell .word-value::before {
   content: '';
   position: absolute;
-  left: -0.55rem;
+  left: 0;
   top: 0.55em;
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: currentColor;
+}
+.daven-cell .word-value.is-empty::before {
+  content: none;
 }
 .daven-cell .word-he {
   flex: 0 0 auto;
