@@ -19,6 +19,7 @@ const { isOpen, toggle } = useWordPopover()
 const open = computed(() => isOpen(props.id))
 const lookupState = computed(() => stateFor(props.word))
 const variations = computed(() => getVariations(props.word))
+const endsSentence = computed(() => /[:׃]/.test(props.word))
 
 const guess = computed({
   get: () => getValue(props.id),
@@ -97,7 +98,11 @@ function onInputTab(e: KeyboardEvent) {
     :class="{ 'input-hidden': !showInput && !showValue, 'showing-value': showValue, 'daven-cell': daven, revealed }"
     :data-word-id="daven ? id : undefined"
   >
-    <span v-if="showValue || (revealed && guess)" class="word-value" :class="{ 'is-empty': !guess }">{{ guess }}</span>
+  <span
+      v-if="showValue || (revealed && guess)"
+      class="word-value"
+      :class="{ 'is-empty': !guess, 'ends-sentence': endsSentence }"
+  >{{ guess }}</span>
     <input
       v-else-if="!showSelect"
       v-model="guess"
@@ -245,19 +250,24 @@ function onInputTab(e: KeyboardEvent) {
 }
 .daven-cell .word-value {
   position: relative;
-  width: 0;
+  /* Contributes only its longest word to the cell's width; min-width:100%
+     then stretches it to the final cell width so text wraps inside it. */
+  width: min-content;
   min-width: 100%;
   box-sizing: border-box;
-  height: auto;
-  /* Left padding reserves space for the margin dot inside the box. */
-  padding: 0.1rem 0 0.1rem 0.55rem;
-  align-items: flex-start;
+  /* Symmetric padding keeps text centered over .word-he; left side holds the dot. */
+  padding: 0.1rem 0.55rem;
   white-space: normal;
   overflow-wrap: break-word;
   overflow: visible;
   line-height: 1.3;
-  /* Zero intrinsic width: the cell sizes to .word-he alone, never the value. */
-  contain: inline-size;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: var(--word-input-h, 1.4rem);
 }
 /* Peeked translation floats above the cell — absolutely positioned so the
    Hebrew word never moves when it opens. */
@@ -283,14 +293,21 @@ function onInputTab(e: KeyboardEvent) {
 /* Margin dot at the left of each translation, in the translation's color —
    inside the value's reserved left padding. */
 .daven-cell .word-value::before {
-  content: '';
   position: absolute;
-  left: 0;
-  top: 0.55em;
-  width: 5px;
-  height: 5px;
+  content: '';
+  min-width: 5px;
+  min-height: 5px;
+  left: -5px;
   border-radius: 50%;
   background: currentColor;
+}
+
+.daven-cell .word-value.ends-sentence::before {
+  content: ':';
+  font-weight: bold;
+  font-size: 25px;
+  border-radius: unset;
+  background: none;
 }
 .daven-cell .word-value.is-empty::before {
   content: none;

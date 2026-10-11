@@ -6,6 +6,7 @@ export interface TextStyle {
 }
 
 const DAVEN_STORAGE_KEY = 'siddur:daven-mode'
+const ENGLISH_STORAGE_KEY = 'siddur:show-english'
 const STYLE_STORAGE_KEY = 'siddur:text-styles'
 
 // px equivalents of the CSS defaults, used when stepping from an unset size.
@@ -83,6 +84,7 @@ export function useSiddurView() {
       restored.value = true
       try {
         if (localStorage.getItem(DAVEN_STORAGE_KEY) === '1') davenMode.value = true
+        if (localStorage.getItem(ENGLISH_STORAGE_KEY) === '1') showEnglish.value = true
       } catch {
         // ignore inaccessible storage
       }
@@ -104,6 +106,13 @@ export function useSiddurView() {
       watch(davenMode, (on) => {
         try {
           localStorage.setItem(DAVEN_STORAGE_KEY, on ? '1' : '0')
+        } catch {
+          // ignore quota/access errors
+        }
+      })
+      watch(showEnglish, (on) => {
+        try {
+          localStorage.setItem(ENGLISH_STORAGE_KEY, on ? '1' : '0')
         } catch {
           // ignore quota/access errors
         }
