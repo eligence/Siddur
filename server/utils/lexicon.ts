@@ -101,11 +101,17 @@ export interface LexiconTable {
 }
 
 let tablePromise: Promise<LexiconTable | null> | null = null
-function loadLexiconTable() {
+export function loadLexiconTable() {
   tablePromise ??= useStorage('assets:server')
     .getItem<LexiconTable>('lexicon.json')
     .catch(() => null)
   return tablePromise
+}
+
+/** Top precomputed lexicon entry for a word form, if any. */
+export function topLexiconEntry(table: LexiconTable | null, form: string): LexiconResult | undefined {
+  const query = table?.forms[lexiconKey(form)]
+  return query ? table!.lemmas[query]?.[0] : undefined
 }
 
 function fromTable(table: LexiconTable, word: string): LexiconResult[] | undefined {

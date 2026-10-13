@@ -94,8 +94,10 @@ function letterStyle(letter: string) {
     <header class="flex items-center justify-between gap-2 border-b border-neutral-200 bg-white px-4 py-3">
       <UButton to="/" icon="i-lucide-arrow-left" color="neutral" variant="ghost" size="sm">Siddur</UButton>
       <h1 class="text-base font-semibold">Word List</h1>
-      <UButton v-if="!wordsOnly" to="/quiz" icon="i-lucide-graduation-cap" color="neutral" variant="outline" size="sm">Quiz</UButton>
-      <span v-else />
+      <div class="flex gap-2">
+        <UButton to="/prefixes" icon="i-lucide-split" color="neutral" variant="outline" size="sm">Prefixes</UButton>
+        <UButton v-if="!wordsOnly" to="/quiz" icon="i-lucide-graduation-cap" color="neutral" variant="outline" size="sm">Quiz</UButton>
+      </div>
     </header>
 
     <ClientOnly>

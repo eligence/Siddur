@@ -10,7 +10,9 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint \"./**/*.{ts,.vue}\" --ignore-pattern \"lang/scripts/\" .",
     "lint:fix": "eslint \"./**/*.{ts,.vue}\" --ignore-pattern \"lang/scripts/\" --fix .",
-    "lexicon:build": "npx tsx scripts/build-lexicon.ts"
+    "lexicon:build": "npx tsx scripts/build-lexicon.ts",
+    "prefixes:report": "npx tsx scripts/classify-prefixes.ts",
+    "test": "npx tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.132",

@@ -227,3 +227,251 @@ export function lexiconLookupCandidates(word: string, max = 12): LookupCandidate
     ...rankedRoots.map((query) => ({ query, root: true })),
   ].slice(0, max)
 }
+
+// --- Prefix classification ------------------------------------------------------
+
+/**
+ * prefix: a separable grammatical prefix (ו ש ב כ ל מ ה).
+ * root: the letter belongs to the word itself.
+ * formative: a verb-pattern / participle letter (הִתְ־, הִ־, מְ־) — part of the word's form.
+ */
+export type PrefixClass = 'prefix' | 'root' | 'formative'
+/** Manual decisions, keyed by lexiconKey(form). */
+export type PrefixOverrides = Record<string, PrefixClass>
+
+export interface PrefixContext {
+  /** Whether a stem occurs as an independent word (e.g. elsewhere in the siddur). */
+  isKnownStem?: (stem: string) => boolean
+  /** Consonantal key of a form's top dictionary headword, or '' if unknown. */
+  headword?: (form: string) => string
+  overrides?: PrefixOverrides
+}
+
+export interface PrefixStep {
+  letter: string
+  function: string
+  reason: string
+  confident: boolean
+}
+
+export interface PrefixAnalysis {
+  word: string
+  /** Classification of the first letter; null when it isn't a prefix letter. */
+  classification: PrefixClass | null
+  /** Peeled prefixes, outermost first. */
+  steps: PrefixStep[]
+  /** The form left after all peeled prefixes. */
+  stem: string
+  /** Grouping form: the stem, or — if only a pronoun suffix is left (לְךָ) — the form before the last peel. */
+  base: string
+  function: string
+  reason: string
+  confident: boolean
+}
+
+const PREFIX_FUNCTION: Record<string, string> = {
+  ו: 'Conjunction "and"',
+  ש: 'Relative pronoun "that/which/who"',
+  ב: 'Preposition "in/at/with"',
+  כ: 'Preposition "like/as"',
+  ל: 'Preposition "to/for"',
+  מ: 'Preposition "from"',
+  ה: 'Definite article "the"',
+}
+// Preposition ב/ל carrying only a pronoun suffix (final letters folded).
+const PRONOUN_FORMS = new Set([
+  'לי', 'לכ', 'לו', 'לה', 'לנו', 'לכמ', 'לכנ', 'להמ', 'להנ',
+  'בי', 'בכ', 'בו', 'בה', 'בנו', 'בכמ', 'בכנ', 'בהמ', 'בהנ', 'במ',
+])
+const DIVINE_NAMES = new Set(['יי', 'יהוה'])
+const POINTING = /[\u05B0-\u05BC\u05C1\u05C2\u05C7]/
+
+/** Comparison key for stems: vowels kept, dagesh dropped (prefixes add/remove it). */
+function stemKey(s: string): string {
+  return lexiconKey(s).replace(/[\u05BC\u05BF]/g, '').replace(/\u05C7/g, QAMATS).replace(/\u05BA/g, '\u05B9')
+}
+
+/** isKnownStem for PrefixContext from a corpus of word forms (pointed stems match by vowels, unpointed by letters). */
+export function knownStemChecker(forms: Iterable<string>): (stem: string) => boolean {
+  const pointed = new Set<string>()
+  const bare = new Set<string>()
+  for (const f of forms) {
+    pointed.add(stemKey(f))
+    bare.add(consonantalKey(f))
+  }
+  return (stem) => (POINTING.test(stem) ? pointed.has(stemKey(stem)) : bare.has(consonantalKey(stem)))
+}
+
+/** Root-letter count of a stem: consonants minus one plural/feminine ending (ים / ות / ה). */
+function baseConsonants(s: string): number {
+  const k = consonantalKey(s)
+  const trimmed = k.replace(/(ימ|ות|ה)$/, '')
+  return (trimmed.length >= 2 ? trimmed : k).length
+}
+
+// Prefix slots, outermost first: ו → כ/מ (before שֶׁ) → שֶׁ → ב/כ/ל/מ → ה.
+function prefixStage(cs: Cluster[], i: number, from: number, pointed: boolean): number {
+  const c = cs[i]!.letter
+  if (from <= 0 && c === 'ו') return 0
+  if (from <= 1 && 'כמ'.includes(c) && cs[i + 1]?.letter === 'ש' && cs[i + 2]) {
+    if (!pointed || isRelative(cs[i + 1]!, cs[i + 2]!)) return 1
+  }
+  if (from <= 2 && c === 'ש') return 2
+  if (from <= 3 && 'בכלמ'.includes(c)) return 3
+  // ב/כ/ל absorb the article (בַּ־), so a written ה after them is part of the word (לְהַקְרִיב).
+  if (from <= 4 && c === 'ה' && !(from === 4 && 'בכל'.includes(cs[i - 1]!.letter))) return 4
+  return -1
+}
+
+/** Does the pointing fit the prefix pattern, and is it unambiguous (vowel + dagesh)? */
+function prefixPointing(stage: number, c: Cluster, n: Cluster): { ok: boolean; strong: boolean } {
+  if (stage === 0) return { ok: true, strong: true }
+  if (stage === 2) return { ok: isRelative(c, n), strong: has(n, DAGESH) }
+  if (stage === 4) {
+    // The article's dagesh is often dropped in a letter with sheva (הַמְבָרֵךְ): ambiguous with hif'il.
+    if (has(c, PATACH) && has(n, SHEVA) && !has(n, DAGESH)) return { ok: true, strong: false }
+    return { ok: isArticle(c, n), strong: !has(c, HATAF_PATACH) }
+  }
+  if (c.letter === 'מ') return { ok: isFromPrefix(c, n), strong: has(c, HIRIQ) && has(n, DAGESH) }
+  return { ok: isPreposition(c, n), strong: (has(c, PATACH) || has(c, QAMATS)) && has(n, DAGESH) }
+}
+
+function prefixFunction(stage: number, c: Cluster): string {
+  if (stage === 4 && has(c, HATAF_PATACH)) return 'Interrogative ה (yes/no question)'
+  const base = PREFIX_FUNCTION[c.letter]!
+  // ב/כ/ל with patach/qamats has absorbed the definite article.
+  if (stage === 3 && c.letter !== 'מ' && (has(c, PATACH) || has(c, QAMATS))) return `${base} + "the"`
+  return base
+}
+
+/** Verb-pattern / participle pattern for a non-prefix initial ה or מ. */
+function formativePattern(c: Cluster, n: Cluster): string | null {
+  const reduced = has(n, SHEVA) || has(n, HATAF_PATACH) || has(n, HATAF_SEGOL)
+  if (c.letter === 'ה') {
+    if ((has(c, HIRIQ) || has(c, SEGOL)) && (reduced || n.letter === 'ת')) {
+      return n.letter === 'ת' ? "Hitpa'el verb prefix ה" : "Hif'il verb prefix ה"
+    }
+    if (has(c, PATACH) && has(n, SHEVA) && !has(n, DAGESH)) return "Hif'il verb prefix ה"
+  }
+  if (c.letter === 'מ' && (has(c, SHEVA) || ((has(c, PATACH) || has(c, HIRIQ)) && reduced))) {
+    return 'Participle / noun-forming מ'
+  }
+  return null
+}
+
+interface PrefixDecision {
+  peel: boolean
+  classification: PrefixClass
+  function: string
+  reason: string
+  confident: boolean
+}
+
+/**
+ * Classify a word's leading letters as grammatical prefixes or part of the word,
+ * peeling stacked prefixes (ו → כ/מ+שֶׁ → שֶׁ → ב/כ/ל/מ → ה). Per letter, in order:
+ * manual override → preposition + pronoun / Divine Name → 1-letter remainder (Rule A)
+ * → pointing filter → dictionary headword → independent-word test (Rule B)
+ * → consonant count of the remainder (Rules A/B), boosted by a soft בכפ after ב/כ.
+ */
+export function classifyPrefix(word: string, ctx: PrefixContext = {}): PrefixAnalysis {
+  const cs = toClusters(word)
+  const pointed = POINTING.test(word)
+  const isKnown = ctx.isKnownStem ?? (() => false)
+  const origHead = ctx.headword?.(word) ?? ''
+  const text = (from: number) => cs.slice(from).map((c) => c.text).join('')
+
+  const decide = (i: number, stage: number): PrefixDecision => {
+    const c = cs[i]!
+    const n = cs[i + 1]!
+    const letter = c.letter
+    const form = text(i)
+    const stem = text(i + 1)
+    const fn = prefixFunction(stage, c)
+    const peel = (reason: string, confident: boolean, func = fn): PrefixDecision =>
+      ({ peel: true, classification: 'prefix', function: func, reason, confident })
+    const keep = (classification: PrefixClass, func: string, reason: string, confident: boolean): PrefixDecision =>
+      ({ peel: false, classification, function: func, reason, confident })
+
+    const override = ctx.overrides?.[lexiconKey(form)]
+    if (override === 'prefix') return peel('Manual override', true)
+    if (override) return keep(override, override === 'root' ? 'Part of the word' : 'Grammatical form letter', 'Manual override', true)
+
+    const formKey = consonantalKey(form)
+    const stemCons = consonantalKey(stem)
+    if (stage === 3 && PRONOUN_FORMS.has(formKey) && !has(c, TSERE)) {
+      return peel('Preposition carrying a pronoun suffix (exception to the 3-consonant rule)', true, `${PREFIX_FUNCTION[letter]} + pronoun suffix`)
+    }
+    if (stage !== 2 && DIVINE_NAMES.has(stemCons)) return peel('Attached to the Divine Name', true)
+
+    const head = ctx.headword?.(form) || origHead
+    const h2 = head.length >= 2 ? head.slice(0, 2) : ''
+    const spans = !!h2 && formKey.startsWith(h2) && !stemCons.startsWith(h2)
+
+    const notPrefix = (reason: string, confident: boolean): PrefixDecision => {
+      const pattern = i === 0 ? formativePattern(c, n) : null
+      if (pattern) {
+        if (spans) return keep('root', 'Part of the word', `The dictionary headword (${head}) includes ${letter} as a root letter`, true)
+        if (h2) return keep('formative', pattern, `${pattern}; the dictionary headword (${head}) is the root without it`, true)
+        if (baseConsonants(form) >= 4) return keep('formative', pattern, `${pattern} pattern — part of the word's grammatical form, not a separable prefix`, false)
+      }
+      return keep('root', 'Part of the word', reason, confident)
+    }
+
+    if (cs.length - i - 1 < 2) return notPrefix('Removing it leaves a single letter, so it belongs to the word (Rule A)', true)
+
+    const known = isKnown(stem)
+    const cons = baseConsonants(stem)
+    const pt = pointed ? prefixPointing(stage, c, n) : { ok: known && cons >= 3, strong: false }
+    if (!pt.ok) {
+      return notPrefix(pointed
+        ? 'Its vowel pointing does not fit the prefix pattern'
+        : 'Unpointed, and the remainder is not an independent 3-letter word', pointed || spans)
+    }
+
+    if (spans) {
+      if (known && cons >= 3) return peel(`The headword (${head}) includes ${letter}, but ${stem} is an independent word (Rule B)`, pointed)
+      return notPrefix(`The dictionary headword (${head}) includes ${letter} as a root letter`, true)
+    }
+    if (known) return peel(`Removing it leaves the independent word ${stem} (Rule B / context test)`, pointed)
+    if (h2 && stemCons.startsWith(h2)) return peel(`The dictionary headword (${head}) starts after the prefix`, pointed)
+    const soft = stage === 3 && 'בכ'.includes(letter) && 'בכפ'.includes(n.letter) && !has(n, DAGESH)
+    if (cons >= 3) {
+      return peel(`Pointing fits and ${cons} consonants remain (Rule B)${soft ? '; a soft ב/כ/פ follows' : ''}`, pt.strong || soft)
+    }
+    if (pt.strong) return peel('Unambiguous prefix pointing (vowel + dagesh)', false)
+    return notPrefix(`Only ${cons} consonants would remain (Rule A)`, false)
+  }
+
+  const steps: PrefixStep[] = []
+  let stop: PrefixDecision | null = null
+  let stage = 0
+  let i = 0
+  for (; i < cs.length - 1; i++) {
+    const found = prefixStage(cs, i, stage, pointed)
+    if (found < 0) break
+    const d = decide(i, found)
+    if (!d.peel) {
+      stop = d
+      break
+    }
+    steps.push({ letter: cs[i]!.letter, function: d.function, reason: d.reason, confident: d.confident })
+    stage = found + 1
+  }
+
+  const stem = text(i)
+  const base = steps.length && cs.length - i < 2 ? text(i - 1) : stem
+  if (!steps.length && !stop) {
+    return { word, classification: null, steps, stem, base, function: '', reason: 'Does not start with a prefix letter', confident: true }
+  }
+  return {
+    word,
+    classification: steps.length ? 'prefix' : stop!.classification,
+    steps,
+    stem,
+    base,
+    function: steps.length ? steps.map((s) => s.function).join(' + ') : stop!.function,
+    reason: steps.length ? steps.map((s) => `${s.letter}: ${s.reason}`).join('; ') : stop!.reason,
+    confident: steps.every((s) => s.confident) && (stop?.confident ?? true),
+  }
+}

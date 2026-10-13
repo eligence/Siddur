@@ -1,72 +1,97 @@
 import type { QuizWord, SectionText, TocNode } from '../../shared/types/siddur'
+import type { PrefixContext, PrefixOverrides } from '../../shared/utils/hebrew'
 
 const SIDDUR_TITLE = 'Weekday Siddur Chabad'
 
-function leafRefs(node: TocNode): string[] {
-  if (node.children) return node.children.flatMap(leafRefs)
-  return node.ref ? [node.ref] : []
+export interface SiddurLeaf {
+  /** Top-level TOC node (one /siddur/<slug> page). */
+  top: TocNode
+  leaf: TocNode
+  ref: string
 }
 
-async function fetchAllTexts(refs: string[], concurrency = 5) {
-  const texts: SectionText[] = []
+function leafNodes(node: TocNode): TocNode[] {
+  if (node.children) return node.children.flatMap(leafNodes)
+  return node.ref ? [node] : []
+}
+
+/** Every leaf section of the siddur in order, with its text (missing if the fetch failed). */
+export async function loadSiddurTexts(concurrency = 5) {
+  const index = await fetchSefariaIndex(SIDDUR_TITLE)
+  const tops = buildToc(index.schema).children ?? []
+  const leaves: SiddurLeaf[] = tops.flatMap((top) => leafNodes(top).map((leaf) => ({ top, leaf, ref: leaf.ref! })))
+  const texts = new Map<string, SectionText>()
   let failed = false
   let cursor = 0
   async function worker() {
-    while (cursor < refs.length) {
-      const ref = refs[cursor++]!
+    while (cursor < leaves.length) {
+      const { ref } = leaves[cursor++]!
       try {
-        texts.push(await fetchSefariaText(ref))
+        texts.set(ref, await fetchSefariaText(ref))
       } catch {
         failed = true
       }
     }
   }
   await Promise.all(Array.from({ length: concurrency }, worker))
-  return { texts, failed }
+  return { leaves, texts, failed }
 }
 
-export async function buildWordList(): Promise<QuizWord[]> {
-  const storage = useStorage('cache')
-  const cacheKey = 'sefaria:wordlist:v6'
-  const cached = await storage.getItem<QuizWord[]>(cacheKey)
-  if (cached) return cached
+/** The Hebrew word forms of a words-segment token, as counted by the word list (or [] for non-Hebrew). */
+export function tokenForms(token: string): string[] {
+  // A maqaf (־) joins separate words for reading (e.g. עַל֯־פְּנֵי), so count each part.
+  // NFC decomposes presentation forms so prefix detection sees base letters.
+  return token
+    .split('\u05BE')
+    .map((raw) => cleanHebrewWord(raw).normalize('NFC'))
+    // Skip non-Hebrew tokens (e.g. Omer day numbers).
+    .filter((form) => /^[\u05D0-\u05EA]+$/.test(normalizeHebrewWord(form)))
+}
 
-  const index = await fetchSefariaIndex(SIDDUR_TITLE)
-  const { texts, failed } = await fetchAllTexts(leafRefs(buildToc(index.schema)))
-
-  // Pass 1: count every vowelized form and record which bare keys occur on their own.
+/** Count every vowelized form. */
+export function countForms(texts: Iterable<SectionText>): Map<string, number> {
   const formCounts = new Map<string, number>()
-  const standaloneKeys = new Set<string>()
   for (const text of texts) {
     for (const para of text.paragraphs) {
       for (const seg of para.segments) {
         if (seg.type !== 'words') continue
-        // A maqaf (־) joins separate words for reading (e.g. עַל֯־פְּנֵי), so count each part.
-        for (const raw of seg.words.flatMap((w) => w.split('\u05BE'))) {
-          // NFC decomposes presentation forms so prefix detection sees base letters.
-          const form = cleanHebrewWord(raw).normalize('NFC')
-          const key = normalizeHebrewWord(form)
-          // Skip non-Hebrew tokens (e.g. Omer day numbers).
-          if (!/^[\u05D0-\u05EA]+$/.test(key)) continue
-          standaloneKeys.add(key)
-          formCounts.set(form, (formCounts.get(form) ?? 0) + 1)
-        }
+        for (const form of seg.words.flatMap(tokenForms)) formCounts.set(form, (formCounts.get(form) ?? 0) + 1)
       }
     }
   }
+  return formCounts
+}
 
-  // Pass 2: a leading ו ("and") is always folded. Other prefixes (ב/כ/ל/מ/ה) fold
-  // into the deepest stem that also appears standalone in the siddur — so
-  // וְהַמֶּלֶךְ counts toward מֶלֶךְ, while בָּרוּךְ stays intact because רוּךְ never
-  // occurs on its own.
+/** classifyPrefix context: lexicon headwords + the siddur's own forms as known stems. */
+export async function createPrefixContext(forms: Iterable<string>, overrides: PrefixOverrides): Promise<PrefixContext> {
+  const lexicon = await loadLexiconTable()
+  return {
+    isKnownStem: knownStemChecker(forms),
+    headword: (form) => {
+      const top = topLexiconEntry(lexicon, form)
+      return top ? consonantalKey(top.headword) : ''
+    },
+    overrides,
+  }
+}
+
+export async function buildWordList(): Promise<QuizWord[]> {
+  const storage = useStorage('cache')
+  const overrides = await loadPrefixOverrides()
+  const cacheKey = `sefaria:wordlist:v10:${overridesFingerprint(overrides)}`
+  const cached = await storage.getItem<QuizWord[]>(cacheKey)
+  if (cached) return cached
+
+  const { texts, failed } = await loadSiddurTexts()
+  const formCounts = countForms(texts.values())
+
+  // Prefixes (ו/שֶׁ/ב/כ/ל/מ/ה) are stripped per classifyPrefix — pointing, the
+  // form's lexicon headword, whether the remainder occurs on its own in the siddur, and
+  // prefix.overrides.json — so בְּצֶלֶם folds into צלם, while בָּרוּךְ (ברך) and לְבָבִי (לבב) stay intact.
+  const prefixCtx = await createPrefixContext(formCounts.keys(), overrides)
   const entries = new Map<string, { count: number; forms: Map<string, number> }>()
   for (const [form, n] of formCounts) {
-    let key = normalizeHebrewWord(form)
-    const startsWithVav = key.startsWith('ו')
-    hebrewPrefixStems(form).forEach((stem, i) => {
-      const stemKey = normalizeHebrewWord(stem)
-      if (standaloneKeys.has(stemKey) || (i === 0 && startsWithVav)) key = stemKey
-    })
+    const key = normalizeHebrewWord(classifyPrefix(form, prefixCtx).base)
     let entry = entries.get(key)
     if (!entry) {
       entry = { count: 0, forms: new Map() }
