@@ -177,6 +177,35 @@ watch(page, () => window.scrollTo({ top: 0 }))
 
 // --- Overrides ---
 const saving = ref(new Set<string>())
+const bulkAccepting = ref(false)
+
+async function acceptSampleRemainder() {
+  const sample = acceptanceSample.value
+  if (!sample?.eligible || bulkAccepting.value) return
+  const remainder = stageRows.value.filter((row) => !row.override)
+  if (!remainder.length) return
+  bulkAccepting.value = true
+  try {
+    await $fetch('/api/prefixes/overrides/bulk', {
+      method: 'PUT',
+      body: { words: remainder.map((row) => row.word), classification: 'root' },
+    })
+    for (const row of remainder) row.override = 'root'
+    toast.add({
+      title: `Accepted ${remainder.length} remaining forms`,
+      description: 'The completed zero-exception sample supports the rules’ Root classification.',
+      color: 'success',
+    })
+  } catch (e) {
+    toast.add({
+      title: 'Could not accept the remaining forms',
+      description: (e as { statusMessage?: string }).statusMessage ?? String(e),
+      color: 'error',
+    })
+  } finally {
+    bulkAccepting.value = false
+  }
+}
 async function setClass(row: PrefixReportRow, value: PrefixClass | null, persist = false) {
   // On confident rows, choosing what the rules already say just clears the override;
   // on low-confidence rows it's saved as a confirmation. `persist` (spot-check)
@@ -188,6 +217,7 @@ async function setClass(row: PrefixReportRow, value: PrefixClass | null, persist
   saving.value = new Set(saving.value).add(row.word)
   try {
     await $fetch('/api/prefixes/overrides', { method: 'PUT', body: { word: row.word, classification: next } })
+    await acceptSampleRemainder()
   } catch (e) {
     row.override = prev
     toast.add({
@@ -267,7 +297,7 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
               {{ acceptanceSample.exceptions }} sample exception{{ acceptanceSample.exceptions === 1 ? '' : 's' }} found. Do not bulk-accept this step.
             </p>
             <p v-else-if="acceptanceSample.eligible" class="mt-2 font-medium text-green-700">
-              Sample passed with zero exceptions. The remainder is eligible for an explicit bulk-accept action.
+              Sample passed with zero exceptions. The remaining forms are being accepted as Root automatically.
             </p>
             <p v-else class="mt-2 text-blue-800">
               Review every displayed form; any classification other than Root is an exception.
@@ -307,7 +337,7 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
                   class="class-select"
                   :class="unresolved(r) ? 'class-review' : `class-${effective(r)}`"
                   :value="selectValue(r)"
-                  :disabled="!data.editable || saving.has(r.word)"
+                  :disabled="!data.editable || bulkAccepting || saving.has(r.word)"
                   :aria-label="`Classification of ${r.word}`"
                   @change="onSelect(r, $event)"
                 >
@@ -356,13 +386,13 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
                 {{ r.locations[0].before }} <mark>{{ r.locations[0].word }}</mark> {{ r.locations[0].after }}
               </p>
               <div class="flex flex-wrap gap-2">
-                <UButton size="sm" color="info" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, 'prefix', true)">
+                <UButton size="sm" color="info" variant="soft" :disabled="!data.editable || bulkAccepting || saving.has(r.word)" @click="setClass(r, 'prefix', true)">
                   Prefix — peel
                 </UButton>
-                <UButton size="sm" color="success" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, 'root', true)">
+                <UButton size="sm" color="success" variant="soft" :disabled="!data.editable || bulkAccepting || saving.has(r.word)" @click="setClass(r, 'root', true)">
                   Root — keep whole
                 </UButton>
-                <UButton size="sm" color="secondary" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, 'formative', true)">
+                <UButton size="sm" color="secondary" variant="soft" :disabled="!data.editable || bulkAccepting || saving.has(r.word)" @click="setClass(r, 'formative', true)">
                   Formative — keep whole
                 </UButton>
               </div>

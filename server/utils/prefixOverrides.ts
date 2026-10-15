@@ -39,14 +39,25 @@ export async function loadRevertedPrefixes(): Promise<Set<string>> {
   return new Set(keys ?? [])
 }
 
-/** Set (or with null, clear) the override for a word; returns the updated overrides. */
+async function writePrefixOverrides(overrides: PrefixOverrides): Promise<PrefixOverrides> {
+  const sorted = Object.fromEntries(Object.entries(overrides).sort(([a], [b]) => a.localeCompare(b)))
+  await writeFile(devPath(FILE), `${JSON.stringify(sorted, null, 2)}\n`)
+  return sorted
+}
+
+/** Set (or with null, clear) a word's prefix override; returns the updated overrides. */
 export async function savePrefixOverride(word: string, classification: PrefixClass | null): Promise<PrefixOverrides> {
   const overrides = await loadPrefixOverrides()
   if (classification) overrides[word] = classification
   else delete overrides[word]
-  const sorted = Object.fromEntries(Object.entries(overrides).sort(([a], [b]) => a.localeCompare(b)))
-  await writeFile(devPath(FILE), `${JSON.stringify(sorted, null, 2)}\n`)
-  return sorted
+  return writePrefixOverrides(overrides)
+}
+
+/** Set one classification on many words in a single file write. */
+export async function savePrefixOverrides(words: string[], classification: PrefixClass): Promise<PrefixOverrides> {
+  const overrides = await loadPrefixOverrides()
+  for (const word of words) overrides[word] = classification
+  return writePrefixOverrides(overrides)
 }
 
 /** Short stable fingerprint of the overrides, for cache keys. */
