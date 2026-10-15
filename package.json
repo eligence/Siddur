@@ -12,6 +12,7 @@
     "lint:fix": "eslint \"./**/*.{ts,.vue}\" --ignore-pattern \"lang/scripts/\" --fix .",
     "lexicon:build": "npx tsx scripts/build-lexicon.ts",
     "prefixes:report": "npx tsx scripts/classify-prefixes.ts",
+    "prefixes:eval": "python3 scripts/eval-prefix-models.py",
     "test": "npx tsx --test tests/*.test.ts"
   },
   "dependencies": {

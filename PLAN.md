@@ -139,6 +139,42 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 
 ---
 
+## Phase 4 — LM-assisted morphology (in progress)
+
+Goal: augment (not yet replace) the hand-rolled `classifyPrefix` rules — and eventually get lemma-level folding — with model predictions. The manual labels in `server/assets/prefix.overrides.json` are the gold set; **evaluate before integrating anything**.
+
+### Candidate backends (ranked by domain fit)
+
+- **DICTA morph-analysis** (`morph-analysis.dicta.org.il`) — purpose-built rabbinic/Aramaic analyzer (per-word `unvocalized_lex`, POS, `fAramaic` flag; would also cover the Aramaic forms in `lexicon.unmatched.txt`). Check for API/bulk export.
+- **DictaLM instruct via Ollama** (`DictaLM-3.0-1.7B-Instruct` GGUF runs locally on Apple Silicon; `dictalm-rab-7b` as upgrade path) — reads the **pointed** text natively, per-paragraph prompt → JSON `{prefixes, stem, lemma}`. Non-deterministic; needs output validation.
+- **`dicta-il/dictabert-joint`** — deterministic structured output (`seg`, `lex`, `morph.prefixes`, suffix analysis) via `model.predict(..., output_style='json')`, `trust_remote_code=True`, heads `do_prefix/do_morph/do_lex` only. Trained on **unvocalized modern** Hebrew — niqqud must be stripped (pointing signal lost) and liturgical register is out-of-domain; used as the baseline.
+- **BEREL 2.0** — rabbinic-domain encoder (Sefaria + Dicta library); no segmentation head, deferred.
+
+### Eval — results (2026-10-14, 205 gold rows)
+
+- `npm run prefixes:eval` (`scripts/eval-prefix-models.py`, needs the dev server): fetches `/api/prefixes`, uses rows with overrides as gold (prefix vs. non-prefix), compares the rules baseline vs. each backend on the same ±5-word contexts, writes `reports/prefix-model-eval.md`. Predictions cached in `.cache/prefix-eval-*.json`.
+- Requires Python 3.10+; `pip install transformers torch` for `--backend joint` and `--backend dictalm` (HF, MPS). Ollama backend unused — HF covers the generative slot.
+- **Accuracy**: rules 77% · joint 79% (6 skipped) · dictalm 85% · **majority 88%** — the 3-vote majority beats every single voter.
+- On rules⊕dictalm disagreements dictalm is right 29/41 (71%); on rules⊕joint it tiebreaks right 54/69 (78%).
+- Full-sentence context (`--context sentence`) did not beat the ±5-word window.
+
+### Full-corpus pass (`--all-forms`) — done, 4,489 rows
+
+- Unanimous rules=joint=dictalm on **3,017** rows → auto-accepted.
+- **Review queue: 1,472 non-unanimous forms**, frequency-sorted at the bottom of `reports/prefix-model-eval.md`. Composition is systematic — dictalm is the only backend that ever argues "prefix" against consensus:
+  - **1,101** rows: dictalm alone says prefix (rules+joint say non) — the risky tranche, needs manual check or a spot-sample to estimate dictalm precision here.
+  - **211** rows: rules+dictalm say prefix, joint says non (joint under-split / missed).
+  - **145** rows: joint+dictalm say prefix, rules says non (rules missed).
+  - ~15 rows with a missing vote.
+- Workflow decision embedded: unanimous vote auto-accepts; manual review is bounded to the queue instead of the whole corpus.
+
+### Intended integration (post-eval)
+
+- Offline precompute (same pattern as `npm run lexicon:build`) → `server/assets/segmentation.json` keyed by `lexiconKey` → consumed via a new `PrefixContext.modelSeg` slot: a vote alongside `isKnownStem`/`headword`, weighted highest on non-`strong` pointing decisions (e.g. הַ + sheva, article vs. hif'il). The lemma output may later drive `base`, folding pronominal suffixes and inflections into the word list key.
+- The 1,472-row review queue is the input for that final manual pass; the 356 rows where two model votes agree on prefix (211+145) are the likely-safe subset to pre-decide.
+
+---
+
 ## Open questions / decisions to revisit
 - Word progress is local-only (`localStorage`). If cross-device sync is needed, a lightweight backend/DB would be required.
 - Word tokenization for Hebrew: niqqud/cantillation marks are preserved in the display and stripped only for lexicon lookup. Punctuation is merged into neighboring words at parse time.
