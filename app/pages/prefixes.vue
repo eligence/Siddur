@@ -23,8 +23,21 @@ const binaryAuto = (r: PrefixReportRow) => (r.auto === 'prefix' ? 'prefix' : 'no
 const jointDisagrees = (r: PrefixReportRow) => Boolean(r.models?.joint && r.models.joint !== binaryAuto(r))
 
 const spotCheck = ref(false)
+type ReviewStage = 'all' | 'high-disagreement' | 'high-remaining' | 'low-disagreement' | 'low-remaining'
+const reviewStage = ref<ReviewStage>('all')
+const reviewStageItems = [
+  { label: 'All review steps', value: 'all' },
+  { label: '1. High-confidence disagreements', value: 'high-disagreement' },
+  { label: '2. Remaining high-confidence', value: 'high-remaining' },
+  { label: '3. Low-confidence disagreements', value: 'low-disagreement' },
+  { label: '4. Remaining low-confidence', value: 'low-remaining' },
+]
+const reviewStageOf = (r: PrefixReportRow): Exclude<ReviewStage, 'all'> => {
+  if (r.confident) return jointDisagrees(r) ? 'high-disagreement' : 'high-remaining'
+  return jointDisagrees(r) ? 'low-disagreement' : 'low-remaining'
+}
 // Unjudged first, then high-confidence/model-disagreement rows and frequency; judged rows remain visible for audit.
-const spotRows = computed(() =>
+const revertedRows = computed(() =>
   rows.value
     .filter(revertedTranche)
     .sort((a, b) =>
@@ -34,23 +47,28 @@ const spotRows = computed(() =>
       || b.count - a.count,
     ),
 )
+const spotRows = computed(() =>
+  reviewStage.value === 'all'
+    ? revertedRows.value
+    : revertedRows.value.filter((r) => reviewStageOf(r) === reviewStage.value),
+)
 const spotTally = computed(() => {
   let judged = 0
   let peeled = 0
-  for (const r of spotRows.value) {
+  for (const r of revertedRows.value) {
     if (r.override) {
       judged++
       if (r.override === 'prefix') peeled++
     }
   }
-  return { judged, peeled, kept: judged - peeled, pending: spotRows.value.length - judged }
+  return { judged, peeled, kept: judged - peeled, pending: revertedRows.value.length - judged }
 })
 const confirmed = (r: PrefixReportRow) => r.override === r.auto
 // Unresolved rows show a placeholder instead of preselecting the rules' guess.
 const selectValue = (r: PrefixReportRow) => (unresolved(r) ? '' : effective(r))
 
 const reviewStages = computed(() => {
-  const pending = spotRows.value.filter((r) => !r.override)
+  const pending = revertedRows.value.filter((r) => !r.override)
   return [
     {
       title: 'Review high-confidence model disagreements',
@@ -115,7 +133,7 @@ const tally = computed(() => {
 // --- Pagination ---
 const PAGE_SIZE = 50
 const page = ref(1)
-watch([search, classFilter, reviewOnly, overriddenOnly, spotCheck], () => (page.value = 1))
+watch([search, classFilter, reviewOnly, overriddenOnly, spotCheck, reviewStage], () => (page.value = 1))
 const pageRows = computed(() => shown.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE))
 watch(page, () => window.scrollTo({ top: 0 }))
 
@@ -193,6 +211,7 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
             <USwitch v-model="reviewOnly" label="Needs review" :disabled="spotCheck" />
             <USwitch v-model="overriddenOnly" label="Overridden / confirmed" :disabled="spotCheck" />
             <USwitch v-model="spotCheck" label="Review reverted tranche" />
+            <USelect v-if="spotCheck" v-model="reviewStage" :items="reviewStageItems" class="w-64" />
           </div>
 
           <div v-if="spotCheck" class="rounded-lg border border-neutral-200 bg-white p-4 text-sm">
