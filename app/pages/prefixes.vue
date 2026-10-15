@@ -36,6 +36,25 @@ const reviewStageOf = (r: PrefixReportRow): Exclude<ReviewStage, 'all'> => {
   if (r.confident) return jointDisagrees(r) ? 'high-disagreement' : 'high-remaining'
   return jointDisagrees(r) ? 'low-disagreement' : 'low-remaining'
 }
+const sampledStage = (stage: ReviewStage): stage is 'high-disagreement' | 'high-remaining' =>
+  stage === 'high-disagreement' || stage === 'high-remaining'
+const stableHash = (value: string) => {
+  let hash = 2166136261
+  for (const char of value) {
+    hash ^= char.charCodeAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+const acceptanceSampleSize = (population: number) => {
+  const defects = Math.ceil(population * 0.05)
+  let zeroDefectChance = 1
+  for (let sample = 1; sample <= population; sample++) {
+    zeroDefectChance *= (population - defects - sample + 1) / (population - sample + 1)
+    if (zeroDefectChance <= 0.05) return sample
+  }
+  return population
+}
 // Unjudged first, then high-confidence/model-disagreement rows and frequency; judged rows remain visible for audit.
 const revertedRows = computed(() =>
   rows.value
@@ -47,11 +66,30 @@ const revertedRows = computed(() =>
       || b.count - a.count,
     ),
 )
-const spotRows = computed(() =>
+const stageRows = computed(() =>
   reviewStage.value === 'all'
     ? revertedRows.value
     : revertedRows.value.filter((r) => reviewStageOf(r) === reviewStage.value),
 )
+const acceptanceSample = computed(() => {
+  if (!sampledStage(reviewStage.value)) return null
+  const population = stageRows.value
+  const size = acceptanceSampleSize(population.length)
+  const rows = [...population]
+    .sort((a, b) => stableHash(`${reviewStage.value}:${a.word}`) - stableHash(`${reviewStage.value}:${b.word}`))
+    .slice(0, size)
+  const judged = rows.filter((r) => r.override)
+  const exceptions = judged.filter((r) => r.override !== r.auto)
+  return {
+    population: population.length,
+    size,
+    rows,
+    judged: judged.length,
+    exceptions: exceptions.length,
+    eligible: judged.length === size && exceptions.length === 0,
+  }
+})
+const spotRows = computed(() => acceptanceSample.value?.rows ?? stageRows.value)
 const spotTally = computed(() => {
   let judged = 0
   let peeled = 0
@@ -212,6 +250,28 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
             <USwitch v-model="overriddenOnly" label="Overridden / confirmed" :disabled="spotCheck" />
             <USwitch v-model="spotCheck" label="Review reverted tranche" />
             <USelect v-if="spotCheck" v-model="reviewStage" :items="reviewStageItems" class="w-64" />
+          </div>
+
+          <div v-if="spotCheck && acceptanceSample" class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="font-semibold">Acceptance sample</h2>
+              <UBadge :color="acceptanceSample.eligible ? 'success' : acceptanceSample.exceptions ? 'error' : 'info'" variant="subtle">
+                {{ acceptanceSample.judged }}/{{ acceptanceSample.size }} reviewed
+              </UBadge>
+            </div>
+            <p class="mt-1">
+              Showing a fixed sample of {{ acceptanceSample.size }} from {{ acceptanceSample.population }} forms.
+              Zero exceptions supports accepting the rules' <b>Root</b> classification for the remainder with 95% confidence that the population error rate is below 5%.
+            </p>
+            <p v-if="acceptanceSample.exceptions" class="mt-2 font-medium text-red-700">
+              {{ acceptanceSample.exceptions }} sample exception{{ acceptanceSample.exceptions === 1 ? '' : 's' }} found. Do not bulk-accept this step.
+            </p>
+            <p v-else-if="acceptanceSample.eligible" class="mt-2 font-medium text-green-700">
+              Sample passed with zero exceptions. The remainder is eligible for an explicit bulk-accept action.
+            </p>
+            <p v-else class="mt-2 text-blue-800">
+              Review every displayed form; any classification other than Root is an exception.
+            </p>
           </div>
 
           <div v-if="spotCheck" class="rounded-lg border border-neutral-200 bg-white p-4 text-sm">
