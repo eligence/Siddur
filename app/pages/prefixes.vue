@@ -19,6 +19,8 @@ const VOTE: Record<string, string> = { prefix: '✓P', 'non-prefix': '¬P' }
 const vote = (v?: string) => (v ? (VOTE[v] ?? v) : '—')
 // Rows from the exact 1,192-key bulk-prefix tranche reverted for human review.
 const revertedTranche = (r: PrefixReportRow) => r.reverted
+const binaryAuto = (r: PrefixReportRow) => (r.auto === 'prefix' ? 'prefix' : 'non-prefix')
+const jointDisagrees = (r: PrefixReportRow) => Boolean(r.models?.joint && r.models.joint !== binaryAuto(r))
 
 const spotCheck = ref(false)
 // Unjudged first, then high-confidence/model-disagreement rows and frequency; judged rows remain visible for audit.
@@ -27,9 +29,8 @@ const spotRows = computed(() =>
     .filter(revertedTranche)
     .sort((a, b) =>
       Number(Boolean(a.override)) - Number(Boolean(b.override))
-      || Number(a.confident) - Number(b.confident)
-      || Number(a.models?.joint === (a.auto === 'prefix' ? 'prefix' : 'non-prefix'))
-        - Number(b.models?.joint === (b.auto === 'prefix' ? 'prefix' : 'non-prefix'))
+      || Number(b.confident) - Number(a.confident)
+      || Number(jointDisagrees(b)) - Number(jointDisagrees(a))
       || b.count - a.count,
     ),
 )
@@ -47,6 +48,32 @@ const spotTally = computed(() => {
 const confirmed = (r: PrefixReportRow) => r.override === r.auto
 // Unresolved rows show a placeholder instead of preselecting the rules' guess.
 const selectValue = (r: PrefixReportRow) => (unresolved(r) ? '' : effective(r))
+
+const reviewStages = computed(() => {
+  const pending = spotRows.value.filter((r) => !r.override)
+  return [
+    {
+      title: 'Review high-confidence model disagreements',
+      detail: 'Resolve strong rules calls where DictaBERT-joint disagrees.',
+      count: pending.filter((r) => r.confident && jointDisagrees(r)).length,
+    },
+    {
+      title: 'Review remaining high-confidence forms',
+      detail: 'Confirm or correct the other strong rules calls.',
+      count: pending.filter((r) => r.confident && !jointDisagrees(r)).length,
+    },
+    {
+      title: 'Review low-confidence model disagreements',
+      detail: 'Use pointing, context, and lookup policy where the evidence conflicts.',
+      count: pending.filter((r) => !r.confident && jointDisagrees(r)).length,
+    },
+    {
+      title: 'Review remaining low-confidence forms',
+      detail: 'Resolve the final ambiguous forms manually.',
+      count: pending.filter((r) => !r.confident && !jointDisagrees(r)).length,
+    },
+  ]
+})
 
 // --- Filters ---
 type ClassFilter = 'all' | PrefixClass
@@ -166,6 +193,23 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
             <USwitch v-model="reviewOnly" label="Needs review" :disabled="spotCheck" />
             <USwitch v-model="overriddenOnly" label="Overridden / confirmed" :disabled="spotCheck" />
             <USwitch v-model="spotCheck" label="Review reverted tranche" />
+          </div>
+
+          <div v-if="spotCheck" class="rounded-lg border border-neutral-200 bg-white p-4 text-sm">
+            <h2 class="font-semibold text-neutral-900">Next manual steps</h2>
+            <p class="mt-1 text-neutral-600">Work in this order. For lexicalized or idiomatic forms, keep the whole form for lookup.</p>
+            <ol class="mt-3 flex flex-col gap-3">
+              <li v-for="(stage, index) in reviewStages" :key="stage.title" class="flex items-start gap-3">
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-neutral-100 font-semibold text-neutral-700">{{ index + 1 }}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="font-medium text-neutral-900">{{ stage.title }}</span>
+                    <UBadge :color="stage.count ? 'warning' : 'success'" variant="subtle">{{ stage.count }} pending</UBadge>
+                  </div>
+                  <p class="text-neutral-500">{{ stage.detail }}</p>
+                </div>
+              </li>
+            </ol>
           </div>
 
           <p v-if="!shown.length" class="rounded-lg border border-neutral-200 bg-white p-8 text-center italic text-neutral-500">
