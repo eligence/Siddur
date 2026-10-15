@@ -481,55 +481,63 @@ def main() -> None:
             f'- **{name}**: {hit}/{tot} correct ({100 * hit / tot:.0f}%){f" · {skipped} skipped" if skipped else ""}'
             if tot else f'- **{name}**: no predictions'
         )
-    models = [n for n in results if n != 'rules']
+    models = []
+    for name, preds in results.items():
+        if name == 'rules':
+            continue
+        labels = {label_of(name, preds.get(r['word'], {})) for r in evald}
+        labels.discard(None)
+        if len(labels) < 2:
+            lines.append(f'- **{name} ensemble eligibility**: excluded; produced only {next(iter(labels), "no label")}')
+        else:
+            models.append(name)
     if models:
-        for model_name in models:
-            uh = ut = ih = dis = rr = mr = 0
-            for r in evald:
-                g = gold_label(r['override'])
-                rl = label_of('rules', results['rules'].get(r['word'], {}))
-                ml = label_of(model_name, results[model_name].get(r['word'], {}))
-                if rl is None or ml is None:
-                    continue
-                ut += 1
-                union = 'prefix' if 'prefix' in (rl, ml) else 'non-prefix'
-                inter = 'prefix' if rl == ml == 'prefix' else 'non-prefix'
-                uh += union == g
-                ih += inter == g
-                if rl != ml:
-                    dis += 1
-                    rr += rl == g
-                    mr += ml == g
-            if ut:
-                lines += [
-                    '',
-                    f'Ensemble rules+{model_name} over {ut} rows where both scored:',
-                    f'- **union** (either says prefix): {uh}/{ut} ({100 * uh / ut:.0f}%)',
-                    f'- **intersection** (agree-on-prefix, else non-prefix): {ih}/{ut} ({100 * ih / ut:.0f}%)',
-                    f'- **disagree** on {dis} rows → rules right {rr}, {model_name} right {mr}, neither {dis - rr - mr}',
-                ]
-        if len(results) >= 3:
-            names = list(results)
-            tie_name = next(n for n in names if n not in ('rules', 'joint'))
-            mh = mt = d_tie = d_correct = 0
-            for r in evald:
-                labs = {n: label_of(n, results[n].get(r['word'], {})) for n in names}
-                if any(v is None for v in labs.values()):
-                    continue
-                mt += 1
-                g = gold_label(r['override'])
-                maj = 'prefix' if sum(v == 'prefix' for v in labs.values()) >= 2 else 'non-prefix'
-                mh += maj == g
-                if labs['rules'] != labs['joint']:
-                    d_tie += 1
-                    d_correct += labs[tie_name] == g
-            if mt:
-                lines += [
-                    '',
-                    f'Majority vote over {mt} rows where all {len(names)} scored:',
-                    f'- **majority**: {mh}/{mt} ({100 * mh / mt:.0f}%)',
-                    f'- rules⊕joint disagree on {d_tie} rows → {tie_name} tiebreak right {d_correct}',
-                ]
+        uh = ut = ih = dis = rr = mr = 0
+        for r in evald:
+            g = gold_label(r['override'])
+            rl = label_of('rules', results['rules'].get(r['word'], {}))
+            ml = label_of(models[0], results[models[0]].get(r['word'], {}))
+            if rl is None or ml is None:
+                continue
+            ut += 1
+            union = 'prefix' if 'prefix' in (rl, ml) else 'non-prefix'
+            inter = 'prefix' if rl == ml == 'prefix' else 'non-prefix'
+            uh += union == g
+            ih += inter == g
+            if rl != ml:
+                dis += 1
+                rr += rl == g
+                mr += ml == g
+        if ut:
+            lines += [
+                '',
+                f'Ensemble rules+{models[0]} over {ut} rows where both scored:',
+                f'- **union** (either says prefix): {uh}/{ut} ({100 * uh / ut:.0f}%)',
+                f'- **intersection** (agree-on-prefix, else non-prefix): {ih}/{ut} ({100 * ih / ut:.0f}%)',
+                f'- **disagree** on {dis} rows → rules right {rr}, {models[0]} right {mr}, neither {dis - rr - mr}',
+            ]
+    if len(models) >= 2:
+        names = ['rules', *models]
+        tie_name = next(n for n in names if n not in ('rules', 'joint'))
+        mh = mt = d_tie = d_correct = 0
+        for r in evald:
+            labs = {n: label_of(n, results[n].get(r['word'], {})) for n in names}
+            if any(v is None for v in labs.values()):
+                continue
+            mt += 1
+            g = gold_label(r['override'])
+            maj = 'prefix' if sum(v == 'prefix' for v in labs.values()) >= 2 else 'non-prefix'
+            mh += maj == g
+            if labs['rules'] != labs['joint']:
+                d_tie += 1
+                d_correct += labs[tie_name] == g
+        if mt:
+            lines += [
+                '',
+                f'Majority vote over {mt} rows where all {len(names)} scored:',
+                f'- **majority**: {mh}/{mt} ({100 * mh / mt:.0f}%)',
+                f'- rules⊕joint disagree on {d_tie} rows → {tie_name} tiebreak right {d_correct}',
+            ]
     lines.append('')
     lines.append('## Disagreements vs. gold')
     lines.append('')
@@ -561,9 +569,9 @@ def main() -> None:
         queue_n = len(queue)
         lines += [
             '',
-            f'## Review queue — {queue_n} non-unanimous forms of {len(rows)}',
+            f'## Model-disagreement candidates — {queue_n} forms',
             '',
-            'Unanimous votes auto-accepted; rows with overrides excluded. Sorted by frequency.', '',
+            'Rows with overrides excluded. Sorted by frequency; no model agreement is auto-accepted.', '',
         ]
         for r, labs in queue:
             loc = r['locations'][0] if r['locations'] else {}

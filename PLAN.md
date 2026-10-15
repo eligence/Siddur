@@ -126,7 +126,7 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 ### Build steps
 1. `shared/utils/hebrew.ts` — `normalizeHebrewWord()` (consonantal key, shared with word-progress variations) and `cleanHebrewWord()` (edge-punctuation strip for lexicon lookups), used by both client and server.
 2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Cached as `sefaria:wordlist:v6` (not cached if any section fails).
-   - **Hebrew only**: tokens whose key isn't purely Hebrew letters (e.g. Omer day numbers `1`–`49`) are skipped. Forms are NFC-normalized and `normalizeHebrewWord()` applies NFKD, so presentation-form letters (e.g. `בּ` U+FB31) key the same as base letters.
+   - **Hebrew only**: tokens whose key isn't purely Hebrew letters (e.g. Omer day numbers `1`–`49`) are skipped. Forms are NFC-normalized and `normalizeHebrewWord()` applies NFKD, so vowelization variants collapse to one key. Maqaf-joined tokens (the table keys are split parts) resolve by combining each part's entries.
    - **Maqaf (`־`)**: maqaf-joined tokens (e.g. `עַל֯־פְּנֵי`) are split and each word counted separately. The siddur display keeps them as one token.
    - **Prefix folding (Otiyot HaShimush)**: `hebrewPrefixStems()` in `shared/utils/hebrew.ts` peels formative prefixes in order `ו` → `ב/כ/ל` or `מ` → `ה`, using the pointing rules (e.g. `מִ` + dagesh / `מֵ` before gutturals; `הַ` + dagesh / `הָ` / `הֶ` (only before a qamats/hataf-qamats `ה/ח/ע`, so hif'il `הֶחֱ` stays intact); `בַּ/לָ` with an absorbed article). A leading `ו` is **always** stripped as "and", with no standalone check. For `ב/כ/ל/מ/ה`, a form is folded into the deepest stem whose key **also occurs standalone** in the siddur — this guards root letters (`בָּרוּךְ` stays intact since `רוך` never appears alone).
    - Display form = most frequent unprefixed form. `QuizWord.forms` lists all folded forms (shown in `/words`).
@@ -150,28 +150,30 @@ Goal: augment (not yet replace) the hand-rolled `classifyPrefix` rules — and e
 - **`dicta-il/dictabert-joint`** — deterministic structured output (`seg`, `lex`, `morph.prefixes`, suffix analysis) via `model.predict(..., output_style='json')`, `trust_remote_code=True`, heads `do_prefix/do_morph/do_lex` only. Trained on **unvocalized modern** Hebrew — niqqud must be stripped (pointing signal lost) and liturgical register is out-of-domain; used as the baseline.
 - **BEREL 2.0** — rabbinic-domain encoder (Sefaria + Dicta library); no segmentation head, deferred.
 
-### Eval — results (2026-10-14, 205 gold rows)
+### Eval — reassessed results (2026-10-15, original 205 gold rows)
 
-- `npm run prefixes:eval` (`scripts/eval-prefix-models.py`, needs the dev server): fetches `/api/prefixes`, uses rows with overrides as gold (prefix vs. non-prefix), compares the rules baseline vs. each backend on the same ±5-word contexts, writes `reports/prefix-model-eval.md`. Predictions cached in `.cache/prefix-eval-*.json`.
-- Requires Python 3.10+; `pip install transformers torch` for `--backend joint` and `--backend dictalm` (HF, MPS). Ollama backend unused — HF covers the generative slot.
-- **Accuracy**: rules 77% · joint 79% (6 skipped) · dictalm 85% · **majority 88%** — the 3-vote majority beats every single voter.
-- On rules⊕dictalm disagreements dictalm is right 29/41 (71%); on rules⊕joint it tiebreaks right 54/69 (78%).
-- Full-sentence context (`--context sentence`) did not beat the ±5-word window.
+- `npm run prefixes:eval` (`scripts/eval-prefix-models.py`, needs the dev server): fetches `/api/prefixes`, collapses labels to prefix vs. non-prefix (`root` + `formative`), and caches predictions in `.cache/prefix-eval-*.json`.
+- The original gold set is imbalanced: **174 prefix / 31 non-prefix**. Accuracy alone is therefore misleading.
+- **Rules:** the previously reported 77% remains a baseline measurement, not an automation threshold.
+- **DictaBERT joint:** 158/199 correct (79%, 6 unscored). Confusion matrix: 135 prefix true positives, 23 non-prefix true negatives, 33 false negatives, and 8 false positives.
+- **DictaLM:** 174/205 correct (85%), but predicted `prefix` on all 205 gold rows. Its score exactly equals the 174/205 prefix base rate; it has zero demonstrated ability to identify non-prefix forms.
+- Full-sentence context did not correct DictaLM's constant-positive behavior.
+- The earlier 88% majority result is not evidence for a three-model ensemble: DictaLM contributes a fixed positive vote rather than an independent morphological judgment.
 
-### Full-corpus pass (`--all-forms`) — done, 4,489 rows
+### Full-corpus pass — reassessed, 4,489 rows
 
-- Unanimous rules=joint=dictalm on **3,017** rows → auto-accepted.
-- **Review queue: 1,472 non-unanimous forms**, frequency-sorted at the bottom of `reports/prefix-model-eval.md`. Composition is systematic — dictalm is the only backend that ever argues "prefix" against consensus:
-  - **1,101** rows: dictalm alone says prefix (rules+joint say non) — the risky tranche, needs manual check or a spot-sample to estimate dictalm precision here.
-  - **211** rows: rules+dictalm say prefix, joint says non (joint under-split / missed).
-  - **145** rows: joint+dictalm say prefix, rules says non (rules missed).
-  - ~15 rows with a missing vote.
-- Workflow decision embedded: unanimous vote auto-accepts; manual review is bounded to the queue instead of the whole corpus.
+- DictaBERT joint has **4,454 usable votes**: 3,086 prefix and 1,368 non-prefix; 35 rows are unscored.
+- DictaLM has **4,488 usable votes, all `prefix`**. It must not drive bulk acceptance, agreement counts, or right/wrong review framing.
+- `scripts/build-segmentation.py` previously omitted most joint votes because successful joint cache entries store `seg`/`prefixes`, not `label`. The builder now derives the binary joint label with the evaluator's logic.
+- The 1,192 `prefix` overrides added from the old DictaLM-only tranche were never individually reviewed. They have been reverted while retaining the original 205 labels and 69 later formative judgments (274 unique overrides).
+- `server/assets/prefix.reverted.json` records the exact 1,192-key provenance set. `/prefixes` reviews that set directly, frequency-sorted with unjudged rows first.
+- Review applies the lookup policy: **keep lexicalized or idiomatic forms whole**. Human choices remain three-way (`prefix`, `root`, `formative`); model votes are evidence only.
 
-### Intended integration (post-eval)
+### Intended integration (post-review)
 
-- Offline precompute (same pattern as `npm run lexicon:build`) → `server/assets/segmentation.json` keyed by `lexiconKey` → consumed via a new `PrefixContext.modelSeg` slot: a vote alongside `isKnownStem`/`headword`, weighted highest on non-`strong` pointing decisions (e.g. הַ + sheva, article vs. hif'il). The lemma output may later drive `base`, folding pronominal suffixes and inflections into the word list key.
-- The 1,472-row review queue is the input for that final manual pass; the 356 rows where two model votes agree on prefix (211+145) are the likely-safe subset to pre-decide.
+- Keep offline model output in `server/assets/segmentation.json` as review evidence; do not feed it into runtime folding until independently validated against reviewed labels.
+- Prioritize the fixed reverted tranche by frequency, rules confidence, and rules/joint disagreement. Do not auto-accept unanimous rows.
+- Re-evaluate with class balance and confusion matrices after enough new human judgments exist. Keep the original 205 labels and later judgments separable when measuring generalization.
 
 ---
 
@@ -179,4 +181,3 @@ Goal: augment (not yet replace) the hand-rolled `classifyPrefix` rules — and e
 - Word progress is local-only (`localStorage`). If cross-device sync is needed, a lightweight backend/DB would be required.
 - Word tokenization for Hebrew: niqqud/cantillation marks are preserved in the display and stripped only for lexicon lookup. Punctuation is merged into neighboring words at parse time.
 - `wordId` is index-based (`ref::para::seg::wordIndex`), so punctuation merges shift indices. Saved selections keyed by `wordId` may misalign after merge changes — content-based IDs would be more robust if needed.
-

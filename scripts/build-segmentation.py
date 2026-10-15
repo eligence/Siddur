@@ -12,8 +12,14 @@ CACHE = Path('.cache')
 OUT = Path('server/assets/segmentation.json')
 
 
-def label(v):
-    return v.get('label') if isinstance(v, dict) else v
+def label(v, joint=False):
+    if not isinstance(v, dict):
+        return v
+    if joint:
+        if 'seg' not in v:
+            return None
+        return 'prefix' if v.get('prefixes') or len(v.get('seg') or []) > 1 else 'non-prefix'
+    return v.get('label')
 
 
 def load(name):
@@ -26,8 +32,8 @@ out = {}
 for w in sorted(set(joint) | set(dlm)):
     j, d = joint.get(w), dlm.get(w)
     ent = {}
-    if label(j):
-        ent['joint'] = label(j)
+    if label(j, joint=True):
+        ent['joint'] = label(j, joint=True)
     if isinstance(j, dict) and j.get('seg'):
         ent['jointSeg'] = j['seg']
     if label(d):

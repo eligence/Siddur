@@ -17,28 +17,32 @@ const unresolved = (r: PrefixReportRow) => !r.confident && !r.override
 // Binary vote glyphs: ✓ prefix, ¬ non-prefix, — no vote.
 const VOTE: Record<string, string> = { prefix: '✓P', 'non-prefix': '¬P' }
 const vote = (v?: string) => (v ? (VOTE[v] ?? v) : '—')
-// Rows where DictaLM alone argues 'prefix' and rules classified it 'formative'
-// (the 'root' tranche was bulk-accepted; formative is the last manual pile).
-const dictalmOnly = (r: PrefixReportRow) =>
-  r.models?.dictalm === 'prefix' && r.models?.joint !== 'prefix' && r.auto === 'formative'
+// Rows from the exact 1,192-key bulk-prefix tranche reverted for human review.
+const revertedTranche = (r: PrefixReportRow) => r.reverted
 
 const spotCheck = ref(false)
-// Unjudged first (by frequency), judged rows trail — each new page is actionable.
+// Unjudged first, then low-confidence/model-disagreement rows and frequency; judged rows remain visible for audit.
 const spotRows = computed(() =>
   rows.value
-    .filter(dictalmOnly)
-    .sort((a, b) => Number(Boolean(a.override)) - Number(Boolean(b.override)) || b.count - a.count),
+    .filter(revertedTranche)
+    .sort((a, b) =>
+      Number(Boolean(a.override)) - Number(Boolean(b.override))
+      || Number(a.confident) - Number(b.confident)
+      || Number(a.models?.joint === (a.auto === 'prefix' ? 'prefix' : 'non-prefix'))
+        - Number(b.models?.joint === (b.auto === 'prefix' ? 'prefix' : 'non-prefix'))
+      || b.count - a.count,
+    ),
 )
 const spotTally = computed(() => {
   let judged = 0
-  let right = 0
+  let peeled = 0
   for (const r of spotRows.value) {
     if (r.override) {
       judged++
-      if (r.override === 'prefix') right++
+      if (r.override === 'prefix') peeled++
     }
   }
-  return { judged, right, pending: spotRows.value.length - judged }
+  return { judged, peeled, kept: judged - peeled, pending: spotRows.value.length - judged }
 })
 const confirmed = (r: PrefixReportRow) => r.override === r.auto
 // Unresolved rows show a placeholder instead of preselecting the rules' guess.
@@ -67,7 +71,7 @@ const filtered = computed(() => {
     && (!overriddenOnly.value || r.override),
   )
 })
-// In spot-check mode the list is exactly the dictalm-only queue.
+// In spot-check mode the list is exactly the reverted bulk tranche.
 const shown = computed(() => (spotCheck.value ? spotRows.value : filtered.value))
 
 const tally = computed(() => {
@@ -145,10 +149,9 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
             <UBadge color="primary" variant="subtle">Overridden {{ tally.overridden }}</UBadge>
             <UBadge color="success" variant="subtle">Confirmed {{ tally.confirmed }}</UBadge>
             <template v-if="spotCheck">
-              <UBadge color="secondary" variant="subtle">Spot-check {{ spotTally.pending }} pending</UBadge>
+              <UBadge color="secondary" variant="subtle">Reverted review {{ spotTally.pending }} pending</UBadge>
               <UBadge v-if="spotTally.judged" color="info" variant="subtle">
-                DictaLM right {{ spotTally.right }}/{{ spotTally.judged }}
-                ({{ Math.round((100 * spotTally.right) / spotTally.judged) }}%)
+                Reviewed {{ spotTally.judged }} · peeled {{ spotTally.peeled }} · kept whole {{ spotTally.kept }}
               </UBadge>
             </template>
           </div>
@@ -162,7 +165,7 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
             <USelect v-model="classFilter" :items="classFilterItems" class="w-40" :disabled="spotCheck" />
             <USwitch v-model="reviewOnly" label="Needs review" :disabled="spotCheck" />
             <USwitch v-model="overriddenOnly" label="Overridden / confirmed" :disabled="spotCheck" />
-            <USwitch v-model="spotCheck" label="Spot-check DictaLM" />
+            <USwitch v-model="spotCheck" label="Review reverted tranche" />
           </div>
 
           <p v-if="!shown.length" class="rounded-lg border border-neutral-200 bg-white p-8 text-center italic text-neutral-500">
@@ -219,19 +222,25 @@ const locationPath = (topKey: string, ref: string) => `${sectionPath(topKey)}#${
             </div>
 
             <div v-if="spotCheck" class="mt-3 flex flex-col gap-2 text-sm">
-              <p dir="rtl" class="he-inline text-neutral-700">
-                dictalm: <b>{{ (r.models?.seg ?? []).join(' + ') }}</b>
-                <span v-if="r.models?.stem" class="text-neutral-500">→ stem {{ r.models.stem }}</span>
+              <p class="text-neutral-700">
+                Rules: <b>{{ LABEL[r.auto] }}</b> · {{ r.reason }}
+                <span class="text-neutral-500"> · base <bdi dir="rtl" class="he-inline">{{ r.base }}</bdi></span>
+              </p>
+              <p class="text-neutral-500">
+                Model evidence: joint {{ vote(r.models?.joint) }} · DictaLM {{ vote(r.models?.dictalm) }}
               </p>
               <p v-if="r.locations[0]" dir="rtl" class="snippet">
                 {{ r.locations[0].before }} <mark>{{ r.locations[0].word }}</mark> {{ r.locations[0].after }}
               </p>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <UButton size="sm" color="info" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, 'prefix', true)">
-                  ✓ Prefix — dictalm right
+                  Prefix — peel
                 </UButton>
-                <UButton size="sm" color="neutral" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, r.auto, true)">
-                  ✗ {{ LABEL[r.auto] }} — dictalm wrong
+                <UButton size="sm" color="success" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, 'root', true)">
+                  Root — keep whole
+                </UButton>
+                <UButton size="sm" color="secondary" variant="soft" :disabled="!data.editable || saving.has(r.word)" @click="setClass(r, 'formative', true)">
+                  Formative — keep whole
                 </UButton>
               </div>
             </div>

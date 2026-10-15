@@ -73,6 +73,7 @@ export interface PrefixReportRow {
   /** Classification by the rules alone (ignoring overrides). */
   auto: PrefixClass
   override: PrefixClass | null
+  reverted: boolean
   /** LM votes — 'prefix' / 'non-prefix' per backend, when precomputed. */
   models?: ModelVotes
   base: string

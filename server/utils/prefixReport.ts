@@ -15,6 +15,7 @@ export async function buildPrefixReport(): Promise<PrefixReport> {
   const { leaves, texts } = await loadSiddurTexts()
   const formCounts = countForms(texts.values())
   const overrides = await loadPrefixOverrides()
+  const reverted = await loadRevertedPrefixes()
   const segmentation = await loadSegmentation()
   // Rules only — the override is reported separately so the page can show both.
   const ctx = await createPrefixContext(formCounts.keys(), {})
@@ -64,6 +65,7 @@ export async function buildPrefixReport(): Promise<PrefixReport> {
       count,
       auto: a.classification,
       override: overrides[word] ?? null,
+      reverted: reverted.has(word),
       models: segmentation[word],
       base: a.base,
       headword: top?.headword ?? null,
