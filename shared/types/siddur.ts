@@ -57,6 +57,15 @@ export interface PrefixLocation {
   after: string
 }
 
+/** Binary model votes from segmentation.json (precomputed by scripts/build-segmentation.py). */
+export interface ModelVotes {
+  joint?: string
+  dictalm?: string
+  /** DictaLM's predicted prefix letters + stem (its 'prefix' rationale). */
+  seg?: string[]
+  stem?: string
+}
+
 export interface PrefixReportRow {
   /** lexiconKey(form) — also the key in prefix.overrides.json. */
   word: string
@@ -64,6 +73,8 @@ export interface PrefixReportRow {
   /** Classification by the rules alone (ignoring overrides). */
   auto: PrefixClass
   override: PrefixClass | null
+  /** LM votes — 'prefix' / 'non-prefix' per backend, when precomputed. */
+  models?: ModelVotes
   base: string
   headword: string | null
   meaning: string | null
