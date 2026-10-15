@@ -172,7 +172,7 @@ Goal: augment (not yet replace) the hand-rolled `classifyPrefix` rules — and e
 ### Intended integration (post-review)
 
 - Keep offline model output in `server/assets/segmentation.json` as review evidence; do not feed it into runtime folding until independently validated against reviewed labels.
-- Prioritize the fixed reverted tranche by frequency, rules confidence, and rules/joint disagreement. Do not auto-accept unanimous rows.
+- Prioritize the fixed reverted tranche by high rule confidence, rules/joint disagreement, and frequency. Do not auto-accept unanimous rows.
 - Re-evaluate with class balance and confusion matrices after enough new human judgments exist. Keep the original 205 labels and later judgments separable when measuring generalization.
 
 ---

@@ -1,90 +1,9 @@
 # Reverted prefix tranche — open review
 
-1192 forms from the unverified bulk-prefix operation. 1192 remain unjudged. Sorted with unjudged, low-confidence, model-disagreement, and high-frequency rows first.
+1192 forms from the unverified bulk-prefix operation. 1192 remain unjudged. Sorted with unjudged, high-confidence, model-disagreement, and high-frequency rows first.
 
 Policy: keep lexicalized or idiomatic forms whole for lookup. Model votes are evidence only.
 
-- **בחולקא** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … ימא ארגישת גלגלוי לך קראן **בחולקא** קדישא אחידנא בקדושה דמלכא אתעטפנא. …
-- **בכל** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … סייעני וחזקני במצוה הזאת שאקום **בכל** לילה בחצות ממש ואל יארע …
-- **בנחת** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … ע״י מעשי הרעים ותחזירם לי **בנחת** והשקט ובבטח ועשה יהו״ה אלה״י …
-- **בעדבך** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … ולא תינפוק לא דידך ולא **בעדבך** תוב תוב ימא ארגישת גלגלוי …
-- **בקיטפא** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - עטיפא **בקיטפא** אזדמנת שרי שרי לא תיעול …
-- **הלימוד** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - סדר **הלימוד** ליאר צייט
-- **הרעים** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … וחלאה שנדבק בהם ע״י מעשי **הרעים** ותחזירם לי בנחת והשקט ובבטח …
-- **ואל** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … שאקום בכל לילה בחצות ממש **ואל** יארע לי שום חולי ראש …
-- **ובבטח** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … הרעים ותחזירם לי בנחת והשקט **ובבטח** ועשה יהו״ה אלה״י שיעיר אותי …
-- **והשקט** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … מעשי הרעים ותחזירם לי בנחת **והשקט** ובבטח ועשה יהו״ה אלה״י שיעיר …
-- **וחזקני** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … אתה הוא יהו״ה אלה״י סייעני **וחזקני** במצוה הזאת שאקום בכל לילה …
-- **ויחייני** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - זבדיה ישמרני **ויחייני,** כן יהי רצון מלפניך, אלהים …
-- **ולאתתיה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … דמלכא אתעטפנא. (ולחפיא ליה לרישיה **ולאתתיה** עד שעתא חדא):
-- **ולחפיא** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … קדישא אחידנא בקדושה דמלכא אתעטפנא. **(ולחפיא** ליה לרישיה ולאתתיה עד שעתא …
-- **וללמוד** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … משמרתי להתפלל לפניך יהו״ה אלה״י **וללמוד** תורתך כי אתה הוא יהו״ה …
-- **ונזק** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … שום חולי ראש ושום צער **ונזק** מזה כי אתה שומע תפלת …
-- **ועשה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … ותחזירם לי בנחת והשקט ובבטח **ועשה** יהו״ה אלה״י שיעיר אותי בחצות …
-- **ושסה** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … רְפוּאָה שְׁלֵמָה בְּכָל רמ״ח אֵבָרָיו **ושסה** גִּידָיו וִיגַּדְּלֻהוּ לְתוֹרָה וּלְחֻפָּה וּלְמַעֲשִׂים …
-- **ותחזירם** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … שנדבק בהם ע״י מעשי הרעים **ותחזירם** לי בנחת והשקט ובבטח ועשה …
-- **לרישיה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … בקדושה דמלכא אתעטפנא. (ולחפיא ליה **לרישיה** ולאתתיה עד שעתא חדא):
-- **מזה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … חולי ראש ושום צער ונזק **מזה** כי אתה שומע תפלת עמך …
-- **שאקום** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … אלה״י סייעני וחזקני במצוה הזאת **שאקום** בכל לילה בחצות ממש ואל …
-- **שנדבק** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … תטהר אותם מכל טומאה וחלאה **שנדבק** בהם ע״י מעשי הרעים ותחזירם …
-- **לְהָקִים** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
-  - Only 2 consonants would remain (Rule A)
-  - וַיְהִ֡י בְּיוֹם֩ כַּלּ֨וֹת מֹשֶׁ֜ה **לְהָקִ֣ים** אֶת־הַמִּשְׁכָּ֗ן וַיִּמְשַׁ֨ח אֹת֜וֹ וַיְקַדֵּ֤שׁ אֹתוֹ֙ …
-- **להתפלל** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … הלילה ממש לקום על משמרתי **להתפלל** לפניך יהו״ה אלה״י וללמוד תורתך …
-- **ליה** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … אחידנא בקדושה דמלכא אתעטפנא. (ולחפיא **ליה** לרישיה ולאתתיה עד שעתא חדא):
-- **לקום** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
-  - Unpointed, and the remainder is not an independent 3-letter word
-  - … שיעיר אותי בחצות הלילה ממש **לקום** על משמרתי להתפלל לפניך יהו״ה …
 - **וָעֶד** ×59 — `open`; rules `root` (confident); joint `prefix`; DictaLM `prefix`
   - The dictionary headword (ועד) includes ו as a root letter
   - בָּרוּךְ שֵׁם כְּבוֹד מַלְכוּתוֹ לְעוֹלָם **וָעֶד:**
@@ -3580,3 +3499,84 @@ Policy: keep lexicalized or idiomatic forms whole for lookup. Model votes are ev
 - **שעתא** ×1 — `open`; rules `root` (confident); joint `non-prefix`; DictaLM `prefix`
   - Unpointed, and the remainder is not an independent 3-letter word
   - … (ולחפיא ליה לרישיה ולאתתיה עד **שעתא** חדא):
+- **בחולקא** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … ימא ארגישת גלגלוי לך קראן **בחולקא** קדישא אחידנא בקדושה דמלכא אתעטפנא. …
+- **בכל** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … סייעני וחזקני במצוה הזאת שאקום **בכל** לילה בחצות ממש ואל יארע …
+- **בנחת** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … ע״י מעשי הרעים ותחזירם לי **בנחת** והשקט ובבטח ועשה יהו״ה אלה״י …
+- **בעדבך** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … ולא תינפוק לא דידך ולא **בעדבך** תוב תוב ימא ארגישת גלגלוי …
+- **בקיטפא** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - עטיפא **בקיטפא** אזדמנת שרי שרי לא תיעול …
+- **הלימוד** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - סדר **הלימוד** ליאר צייט
+- **הרעים** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … וחלאה שנדבק בהם ע״י מעשי **הרעים** ותחזירם לי בנחת והשקט ובבטח …
+- **ואל** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … שאקום בכל לילה בחצות ממש **ואל** יארע לי שום חולי ראש …
+- **ובבטח** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … הרעים ותחזירם לי בנחת והשקט **ובבטח** ועשה יהו״ה אלה״י שיעיר אותי …
+- **והשקט** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … מעשי הרעים ותחזירם לי בנחת **והשקט** ובבטח ועשה יהו״ה אלה״י שיעיר …
+- **וחזקני** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … אתה הוא יהו״ה אלה״י סייעני **וחזקני** במצוה הזאת שאקום בכל לילה …
+- **ויחייני** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - זבדיה ישמרני **ויחייני,** כן יהי רצון מלפניך, אלהים …
+- **ולאתתיה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … דמלכא אתעטפנא. (ולחפיא ליה לרישיה **ולאתתיה** עד שעתא חדא):
+- **ולחפיא** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … קדישא אחידנא בקדושה דמלכא אתעטפנא. **(ולחפיא** ליה לרישיה ולאתתיה עד שעתא …
+- **וללמוד** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … משמרתי להתפלל לפניך יהו״ה אלה״י **וללמוד** תורתך כי אתה הוא יהו״ה …
+- **ונזק** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … שום חולי ראש ושום צער **ונזק** מזה כי אתה שומע תפלת …
+- **ועשה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … ותחזירם לי בנחת והשקט ובבטח **ועשה** יהו״ה אלה״י שיעיר אותי בחצות …
+- **ושסה** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … רְפוּאָה שְׁלֵמָה בְּכָל רמ״ח אֵבָרָיו **ושסה** גִּידָיו וִיגַּדְּלֻהוּ לְתוֹרָה וּלְחֻפָּה וּלְמַעֲשִׂים …
+- **ותחזירם** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … שנדבק בהם ע״י מעשי הרעים **ותחזירם** לי בנחת והשקט ובבטח ועשה …
+- **לרישיה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … בקדושה דמלכא אתעטפנא. (ולחפיא ליה **לרישיה** ולאתתיה עד שעתא חדא):
+- **מזה** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … חולי ראש ושום צער ונזק **מזה** כי אתה שומע תפלת עמך …
+- **שאקום** ×1 — `open`; rules `root` (low confidence); joint `—`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … אלה״י סייעני וחזקני במצוה הזאת **שאקום** בכל לילה בחצות ממש ואל …
+- **שנדבק** ×1 — `open`; rules `root` (low confidence); joint `prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … תטהר אותם מכל טומאה וחלאה **שנדבק** בהם ע״י מעשי הרעים ותחזירם …
+- **לְהָקִים** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
+  - Only 2 consonants would remain (Rule A)
+  - וַיְהִ֡י בְּיוֹם֩ כַּלּ֨וֹת מֹשֶׁ֜ה **לְהָקִ֣ים** אֶת־הַמִּשְׁכָּ֗ן וַיִּמְשַׁ֨ח אֹת֜וֹ וַיְקַדֵּ֤שׁ אֹתוֹ֙ …
+- **להתפלל** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … הלילה ממש לקום על משמרתי **להתפלל** לפניך יהו״ה אלה״י וללמוד תורתך …
+- **ליה** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … אחידנא בקדושה דמלכא אתעטפנא. (ולחפיא **ליה** לרישיה ולאתתיה עד שעתא חדא):
+- **לקום** ×1 — `open`; rules `root` (low confidence); joint `non-prefix`; DictaLM `prefix`
+  - Unpointed, and the remainder is not an independent 3-letter word
+  - … שיעיר אותי בחצות הלילה ממש **לקום** על משמרתי להתפלל לפניך יהו״ה …

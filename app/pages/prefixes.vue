@@ -21,7 +21,7 @@ const vote = (v?: string) => (v ? (VOTE[v] ?? v) : '—')
 const revertedTranche = (r: PrefixReportRow) => r.reverted
 
 const spotCheck = ref(false)
-// Unjudged first, then low-confidence/model-disagreement rows and frequency; judged rows remain visible for audit.
+// Unjudged first, then high-confidence/model-disagreement rows and frequency; judged rows remain visible for audit.
 const spotRows = computed(() =>
   rows.value
     .filter(revertedTranche)
