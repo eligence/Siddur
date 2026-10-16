@@ -71,12 +71,12 @@ const stageRows = computed(() =>
     ? revertedRows.value
     : revertedRows.value.filter((r) => reviewStageOf(r) === reviewStage.value),
 )
-const acceptanceSample = computed(() => {
-  if (!sampledStage(reviewStage.value)) return null
-  const population = stageRows.value
+function buildAcceptanceSample(stage: ReviewStage) {
+  if (!sampledStage(stage)) return null
+  const population = revertedRows.value.filter((r) => reviewStageOf(r) === stage)
   const size = acceptanceSampleSize(population.length)
   const rows = [...population]
-    .sort((a, b) => stableHash(`${reviewStage.value}:${a.word}`) - stableHash(`${reviewStage.value}:${b.word}`))
+    .sort((a, b) => stableHash(`${stage}:${a.word}`) - stableHash(`${stage}:${b.word}`))
     .slice(0, size)
   const judged = rows.filter((r) => r.override)
   const exceptions = judged.filter((r) => r.override !== r.auto)
@@ -88,7 +88,8 @@ const acceptanceSample = computed(() => {
     exceptions: exceptions.length,
     eligible: judged.length === size && exceptions.length === 0,
   }
-})
+}
+const acceptanceSample = computed(() => buildAcceptanceSample(reviewStage.value))
 const spotRows = computed(() => acceptanceSample.value?.rows ?? stageRows.value)
 const spotTally = computed(() => {
   let judged = 0
@@ -179,10 +180,10 @@ watch(page, () => window.scrollTo({ top: 0 }))
 const saving = ref(new Set<string>())
 const bulkAccepting = ref(false)
 
-async function acceptSampleRemainder() {
-  const sample = acceptanceSample.value
+async function acceptSampleRemainder(stage = reviewStage.value) {
+  const sample = buildAcceptanceSample(stage)
   if (!sample?.eligible || bulkAccepting.value) return
-  const remainder = stageRows.value.filter((row) => !row.override)
+  const remainder = revertedRows.value.filter((row) => reviewStageOf(row) === stage && !row.override)
   if (!remainder.length) return
   bulkAccepting.value = true
   try {
@@ -217,7 +218,7 @@ async function setClass(row: PrefixReportRow, value: PrefixClass | null, persist
   saving.value = new Set(saving.value).add(row.word)
   try {
     await $fetch('/api/prefixes/overrides', { method: 'PUT', body: { word: row.word, classification: next } })
-    await acceptSampleRemainder()
+    await acceptSampleRemainder(reviewStageOf(row))
   } catch (e) {
     row.override = prev
     toast.add({
