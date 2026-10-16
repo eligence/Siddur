@@ -125,7 +125,7 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 
 ### Build steps
 1. `shared/utils/hebrew.ts` — `normalizeHebrewWord()` (consonantal key, shared with word-progress variations) and `cleanHebrewWord()` (edge-punctuation strip for lexicon lookups), used by both client and server.
-2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Cached as `sefaria:wordlist:v6` (not cached if any section fails).
+2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Separable prefixes are stripped from the displayed headword, and forms that map to the same Sefaria lemma are grouped into one `QuizWord`.
    - **Hebrew only**: tokens whose key isn't purely Hebrew letters (e.g. Omer day numbers `1`–`49`) are skipped. Forms are NFC-normalized and `normalizeHebrewWord()` applies NFKD, so vowelization variants collapse to one key. Maqaf-joined tokens (the table keys are split parts) resolve by combining each part's entries.
    - **Maqaf (`־`)**: maqaf-joined tokens (e.g. `עַל֯־פְּנֵי`) are split and each word counted separately. The siddur display keeps them as one token.
    - **Prefix folding (Otiyot HaShimush)**: `hebrewPrefixStems()` in `shared/utils/hebrew.ts` peels formative prefixes in order `ו` → `ב/כ/ל` or `מ` → `ה`, using the pointing rules (e.g. `מִ` + dagesh / `מֵ` before gutturals; `הַ` + dagesh / `הָ` / `הֶ` (only before a qamats/hataf-qamats `ה/ח/ע`, so hif'il `הֶחֱ` stays intact); `בַּ/לָ` with an absorbed article). A leading `ו` is **always** stripped as "and", with no standalone check. For `ב/כ/ל/מ/ה`, a form is folded into the deepest stem whose key **also occurs standalone** in the siddur — this guards root letters (`בָּרוּךְ` stays intact since `רוך` never appears alone).
@@ -136,6 +136,44 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 5. `app/pages/quiz.vue` — session queue = unmastered words in frequency order. Check → auto-graded result + lexicon definitions; user can override ("I was right" / "Mark incorrect"). Next commits the result (correct → `addVariation`; incorrect → requeued 5 cards later). Skip advances without recording. Enter = Check / Next.
 6. "Quiz" button in the siddur navbar links to `/quiz`.
 7. `app/pages/words.vue` — full word list in frequency order (rank, word, count, quiz streak / mastered badge, saved variations). "Show mastered only" switch filters to mastered words; rank stays the global frequency rank. Clickable "א–ת" (word) / "Count" / "#" headers toggle Hebrew alphabetical order (by consonantal stem key, final letters ך ם ן ף ץ sorted as their regular forms) vs. frequency; chevrons show direction and clicking the active header flips it. When sorted by Word, rows are grouped into a collapsible accordion with one section per first letter (collapsed by default, heading shows letter + word count). Each section has its own hue, stepping evenly around the color wheel from א to ת; rows use a light tint, the header a more opaque tint of the same hue. A "Show variants" switch (on by default) toggles the grey list of folded vowelized/prefixed forms; when off, only the normalized consonantal key is shown. A "Words only" switch hides all personal/quiz UI (streak, translations, mastered badge/filter, Quiz link), leaving just Word / Count / #. Linked from the siddur navbar and quiz header.
+
+---
+
+## Phase 3.5 — Word-list reduction strategies (in progress)
+
+Goal: shrink the active study list while preserving learnable units. The current wordlist already collapses vowelization variants and separable prefixes; the next layer is lemma-level folding.
+
+### Implemented — Sefaria-lemma grouping
+
+`server/utils/wordlist.ts` now loads `server/assets/lexicon.json` and, when a form’s base maps to a Sefaria headword/lemma, groups all matching forms under that lemma instead of under the surface stem. The displayed headword prefers a surface form matching the lemma; if none exists, it falls back to the prefix-stripped stem or the lemma string itself.
+
+Result: the list shrinks modestly (from **4,618** to ~**4,483**) because Sefaria’s liturgical coverage unifies only some entries (e.g., prefixed and construct forms of the same noun). It does **not** collapse most verb inflections, because Sefaria does not provide a single lemma for every binyan/tense of a given root.
+
+### Future strategies
+
+1. **Three-letter root (shoresh) grouping**
+   - For forms that share a triliteral root but are not unified by Sefaria, group them under the root.
+   - Risk: homographic roots (`כתב` = “write” vs. “document”); needs a disambiguation signal or user confirmation.
+
+2. **Model-derived lemma folding**
+   - Use the `lemma` field from `segmentation.json` (DictaLM output) to unify verb inflections.
+   - Risk: DictaLM lemma accuracy is uneven; in testing it incorrectly collapsed `וְחָבִיב` (beloved) into the lemma of `אוֹהֵב` (love). Must validate before relying on it.
+
+3. **Pronominal-suffix stripping**
+   - Fold possessive and objective suffixes back to the base noun/verb: `בֵּיתִי`, `בֵּיתְךָ`, `בֵּיתוֹ` → `בַּיִת`.
+   - Risk: some suffixed forms are high-frequency and may be worth learning independently.
+
+4. **Construct-state normalization**
+   - Collapse smichut pairs to the absolute noun where the construct form is predictable.
+
+5. **Hide or defer hapax legomena**
+   - Forms occurring only once can be hidden by default and surfaced only in a “rare words” view.
+
+6. **Sight-word filter for function particles**
+   - `אֶת`, `שֶׁ`, standalone prepositions, and the stripped `ו`/prefix particles can be marked as sight words and excluded from the default quiz queue.
+
+7. **Hebrew / Aramaic split**
+   - Separate the Aramaic minority (many entries in `lexicon.unmatched.txt`) into its own list/queue so the Hebrew mastery path is not diluted.
 
 ---
 

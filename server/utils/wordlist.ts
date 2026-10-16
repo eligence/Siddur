@@ -1,5 +1,7 @@
 import type { QuizWord, SectionText, TocNode } from '../../shared/types/siddur'
+import { lexiconKey } from '../../shared/utils/hebrew'
 import type { PrefixContext, PrefixOverrides } from '../../shared/utils/hebrew'
+import { loadLexiconTable } from './lexicon'
 
 const SIDDUR_TITLE = 'Weekday Siddur Chabad'
 
@@ -78,7 +80,8 @@ export async function createPrefixContext(forms: Iterable<string>, overrides: Pr
 export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
   const overrides = await loadPrefixOverrides()
-  const cacheKey = `sefaria:wordlist:v11:${overridesFingerprint(overrides)}`
+  const lexicon = await loadLexiconTable()
+  const cacheKey = `sefaria:wordlist:v12:${overridesFingerprint(overrides)}`
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
@@ -89,33 +92,38 @@ export async function buildWordList(): Promise<QuizWord[]> {
   // form's lexicon headword, whether the remainder occurs on its own in the siddur, and
   // prefix.overrides.json — so בְּצֶלֶם folds into צלם, while בָּרוּךְ (ברך) and לְבָבִי (לבב) stay intact.
   const prefixCtx = await createPrefixContext(formCounts.keys(), overrides)
-  const entries = new Map<string, { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string> }>()
+  type Entry = { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string>; lemmaQuery: string | null }
+  const entries = new Map<string, Entry>()
   for (const [form, n] of formCounts) {
     const analysis = classifyPrefix(form, prefixCtx)
-    const key = normalizeHebrewWord(analysis.base)
+    const base = analysis.base
+    const baseKey = normalizeHebrewWord(base)
+    const lemmaQuery = lexicon?.forms[lexiconKey(base)] || null
+    const key = lemmaQuery ? normalizeHebrewWord(lemmaQuery) : baseKey
     let entry = entries.get(key)
     if (!entry) {
-      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set() }
+      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set(), lemmaQuery }
       entries.set(key, entry)
     }
     entry.count += n
     entry.forms.set(form, n)
-    entry.formBase.set(form, analysis.base)
+    entry.formBase.set(form, base)
     if (analysis.classification === 'prefix') entry.prefixForms.add(form)
   }
 
-  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms }]) => {
+  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms, lemmaQuery }]) => {
     const sorted = [...forms].sort((a, b) => b[1] - a[1])
-    // Display the most frequent unprefixed form if one exists; otherwise strip the
-    // prefix from the most frequent prefixed form so the word list headword never
-    // shows a separable prefix.
-    const unprefixed = sorted.find(([f]) => normalizeHebrewWord(f) === key)
-    const prefixFallback = !unprefixed && sorted.find(([f]) => prefixForms.has(f))
-    const word = unprefixed
-      ? unprefixed[0]
+    // Prefer a surface form matching the lemma key. If none exists, strip a
+    // separable prefix from the most frequent prefixed form. As a last resort,
+    // show the lemma itself (for model/lexicon-derived groupings) or the most
+    // frequent surface form.
+    const lemmaForm = sorted.find(([f]) => normalizeHebrewWord(f) === key)
+    const prefixFallback = !lemmaForm && sorted.find(([f]) => prefixForms.has(f))
+    const word = lemmaForm
+      ? lemmaForm[0]
       : prefixFallback
         ? formBase.get(prefixFallback[0])!
-        : sorted[0]![0]
+        : lemmaQuery || sorted[0]![0]
     return { key, word, count, forms: sorted.map(([f]) => f) }
   })
   result.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
