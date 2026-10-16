@@ -182,15 +182,6 @@ The toggles in `/words` hide rows in real time; the same toggles in `/quiz` filt
 3. **Construct-state normalization**
    - Collapse smichut pairs to the absolute noun where the construct form is predictable.
 
-4. **Hide or defer hapax legomena**
-   - Forms occurring only once can be hidden by default and surfaced only in a “rare words” view.
-
-5. **Sight-word filter for function particles**
-   - `אֶת`, `שֶׁ`, standalone prepositions, and the stripped `ו`/prefix particles can be marked as sight words and excluded from the default quiz queue.
-
-6. **Hebrew / Aramaic split**
-   - Separate the Aramaic minority (many entries in `lexicon.unmatched.txt`) into its own list/queue so the Hebrew mastery path is not diluted.
-
 ---
 
 ## Phase 4 — LM-assisted morphology (in progress)
