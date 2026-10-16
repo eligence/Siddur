@@ -14,6 +14,16 @@ const showVariants = ref(true)
 const hideRare = ref(false)
 const hideSight = ref(false)
 const hideAramaic = ref(false)
+// Hide words that occur fewer than this many times.
+const minCount = ref(1)
+const minCountItems = [
+  { label: 'All counts', value: 1 },
+  { label: '≥2', value: 2 },
+  { label: '≥3', value: 3 },
+  { label: '≥4', value: 4 },
+  { label: '≥5', value: 5 },
+  { label: '≥10', value: 10 },
+]
 type SortKey = 'count' | 'alpha' | 'rank'
 type SortDir = 'asc' | 'desc'
 const DEFAULT_DIR: Record<SortKey, SortDir> = { count: 'desc', alpha: 'asc', rank: 'asc' }
@@ -27,15 +37,21 @@ if (import.meta.client) {
     if (typeof saved.hideRare === 'boolean') hideRare.value = saved.hideRare
     if (typeof saved.hideSight === 'boolean') hideSight.value = saved.hideSight
     if (typeof saved.hideAramaic === 'boolean') hideAramaic.value = saved.hideAramaic
+    if (typeof saved.minCount === 'number') minCount.value = saved.minCount
   }
   catch { /* ignore corrupt storage */ }
   watch(
-    [hideRare, hideSight, hideAramaic],
+    [hideRare, hideSight, hideAramaic, minCount],
     () => {
       try {
         localStorage.setItem(
           FILTER_STORAGE_KEY,
-          JSON.stringify({ hideRare: hideRare.value, hideSight: hideSight.value, hideAramaic: hideAramaic.value }),
+          JSON.stringify({
+            hideRare: hideRare.value,
+            hideSight: hideSight.value,
+            hideAramaic: hideAramaic.value,
+            minCount: minCount.value,
+          }),
         )
       }
       catch { /* ignore quota errors */ }
@@ -85,6 +101,7 @@ const sorted = computed(() => {
 const visible = computed(() => {
   let list = sorted.value
   if (showMasteredOnly.value && !wordsOnly.value) list = list.filter((w) => isMastered(w.key))
+  if (minCount.value > 1) list = list.filter((w) => w.count >= minCount.value)
   if (hideRare.value) list = list.filter((w) => !w.tags?.includes('rare'))
   if (hideSight.value) list = list.filter((w) => !w.tags?.includes('sight'))
   if (hideAramaic.value) list = list.filter((w) => !w.tags?.includes('aramaic'))
@@ -150,6 +167,7 @@ function letterStyle(letter: string) {
               <USwitch v-if="!wordsOnly" v-model="showMasteredOnly" label="Show mastered only" />
               <USwitch v-model="showVariants" label="Show variants" />
               <USwitch v-model="wordsOnly" label="Words only" />
+              <USelect v-model="minCount" :items="minCountItems" label="Min count" class="w-32" />
               <USwitch v-model="hideRare" label="Hide rare" />
               <USwitch v-model="hideSight" label="Hide sight words" />
               <USwitch v-model="hideAramaic" label="Hide Aramaic" />

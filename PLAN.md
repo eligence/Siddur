@@ -168,6 +168,8 @@ Every `QuizWord` now carries `tags` computed in `server/utils/wordlist.ts` and u
 
 The toggles in `/words` hide rows in real time; the same toggles in `/quiz` filter the session queue on restart. Filter state is persisted in `localStorage` under `siddur:word-filters-v1` so the two pages share the same choices.
 
+In addition, a **minimum-count filter** lets the user hide words below a chosen frequency threshold (`≥2`, `≥3`, `≥4`, `≥5`, `≥10`). This is the safest remaining reduction without an external morphological source: it is purely data-driven and reversible. With all tag filters plus "count ≥ 2" enabled, the active list drops to ~1,300 entries.
+
 ### Future strategies
 
 1. **Model-derived root/lemma folding**
