@@ -177,6 +177,51 @@ Goal: augment (not yet replace) the hand-rolled `classifyPrefix` rules — and e
 
 ---
 
+## Phase 5 — Model-driven text import and automated morphology (planned)
+
+Goal: generalize the siddur pipeline so users can import arbitrary Hebrew texts, run model-based morphology on them, review the results, and produce a wordlist + lexicon without relying solely on hand-written rules.
+
+### Why not drop the rules yet
+
+- **DictaLM is constant-positive**: it predicted `prefix` on every evaluated form, so it cannot drive classification or bulk acceptance on its own.
+- **DictaBERT-joint is binary**: it emits `prefix` / `non-prefix`, not the three-way `prefix` / `root` / `formative` distinction the app currently uses.
+- The 1,192 reviewed overrides are now a usable gold set, but they have not yet been turned into a trainable model.
+
+For now, the rules remain the safest default. The model pipeline should sit alongside them as an optional, reviewable backend.
+
+### Proposed architecture
+
+1. **New-text import UI**
+   - Add an `/import` page where a user can paste Hebrew text or upload a file.
+   - Tokenize the input with the same `parseHebrewSegments()` / `mergePunctuationTokens()` logic used for Sefaria paragraphs.
+
+2. **Model inference service**
+   - Extract the DictaBERT-joint and DictaLM inference code from `scripts/eval-prefix-models.py` into a reusable Python service (or an API route that shells out to it).
+   - DictaBERT-joint runs locally via `transformers` + `trust_remote_code=True`.
+   - DictaLM runs through a local Ollama/Hugging Face runtime (already supported by the evaluator).
+   - Cache predictions per input hash so re-imports and re-reviews are fast.
+
+3. **Classification backend**
+   - Use DictaBERT-joint as the default classifier for imported texts.
+   - Map `non-prefix` → `root` until a separate `formative` signal exists.
+   - Keep the rules as an optional fallback and as review evidence in the UI.
+
+4. **Review + override workflow**
+   - Generate a `/prefixes`-style report for the imported text.
+   - Let the user review model disagreements and low-confidence forms.
+   - Save overrides to a per-text or global override store and rebuild the wordlist/lexicon.
+
+5. **Generalized lexicon build**
+   - Refactor `scripts/build-lexicon.ts` so it can take any word list (not just the siddur's) and produce `lexicon.json` + `lexicon.unmatched.txt`.
+   - The import flow should be able to run this automatically after review.
+
+### Long-term path to eliminating hardcoded rules
+
+- Use the reviewed overrides (plus the original gold labels and later formative judgments) as training data.
+- Fine-tune a small classifier — or DictaBERT-joint itself — on the three-way labels.
+- Evaluate it against the rules + overrides before making it the default.
+- Only remove the rules once the model consistently outperforms them on held-out data.
+
 ## Open questions / decisions to revisit
 - Word progress is local-only (`localStorage`). If cross-device sync is needed, a lightweight backend/DB would be required.
 - Word tokenization for Hebrew: niqqud/cantillation marks are preserved in the display and stripped only for lexicon lookup. Punctuation is merged into neighboring words at parse time.
