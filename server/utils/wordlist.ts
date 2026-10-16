@@ -78,7 +78,7 @@ export async function createPrefixContext(forms: Iterable<string>, overrides: Pr
 export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
   const overrides = await loadPrefixOverrides()
-  const cacheKey = `sefaria:wordlist:v10:${overridesFingerprint(overrides)}`
+  const cacheKey = `sefaria:wordlist:v11:${overridesFingerprint(overrides)}`
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
@@ -89,22 +89,33 @@ export async function buildWordList(): Promise<QuizWord[]> {
   // form's lexicon headword, whether the remainder occurs on its own in the siddur, and
   // prefix.overrides.json — so בְּצֶלֶם folds into צלם, while בָּרוּךְ (ברך) and לְבָבִי (לבב) stay intact.
   const prefixCtx = await createPrefixContext(formCounts.keys(), overrides)
-  const entries = new Map<string, { count: number; forms: Map<string, number> }>()
+  const entries = new Map<string, { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string> }>()
   for (const [form, n] of formCounts) {
-    const key = normalizeHebrewWord(classifyPrefix(form, prefixCtx).base)
+    const analysis = classifyPrefix(form, prefixCtx)
+    const key = normalizeHebrewWord(analysis.base)
     let entry = entries.get(key)
     if (!entry) {
-      entry = { count: 0, forms: new Map() }
+      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set() }
       entries.set(key, entry)
     }
     entry.count += n
     entry.forms.set(form, n)
+    entry.formBase.set(form, analysis.base)
+    if (analysis.classification === 'prefix') entry.prefixForms.add(form)
   }
 
-  const result: QuizWord[] = [...entries].map(([key, { count, forms }]) => {
+  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms }]) => {
     const sorted = [...forms].sort((a, b) => b[1] - a[1])
-    // Display the most frequent unprefixed form; fall back to the most frequent overall.
-    const word = (sorted.find(([f]) => normalizeHebrewWord(f) === key) ?? sorted[0]!)[0]
+    // Display the most frequent unprefixed form if one exists; otherwise strip the
+    // prefix from the most frequent prefixed form so the word list headword never
+    // shows a separable prefix.
+    const unprefixed = sorted.find(([f]) => normalizeHebrewWord(f) === key)
+    const prefixFallback = !unprefixed && sorted.find(([f]) => prefixForms.has(f))
+    const word = unprefixed
+      ? unprefixed[0]
+      : prefixFallback
+        ? formBase.get(prefixFallback[0])!
+        : sorted[0]![0]
     return { key, word, count, forms: sorted.map(([f]) => f) }
   })
   result.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
