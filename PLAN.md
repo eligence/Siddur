@@ -155,9 +155,10 @@ Result: the list shrinks modestly (from **4,618** to ~**4,483**) because Sefaria
    - For forms that share a triliteral root but are not unified by Sefaria, group them under the root.
    - Risk: homographic roots (`כתב` = “write” vs. “document”); needs a disambiguation signal or user confirmation.
 
-2. **Model-derived lemma folding**
+2. **Model-derived root/lemma folding**
    - Use the `lemma` field from `segmentation.json` (DictaLM output) to unify verb inflections.
-   - Risk: DictaLM lemma accuracy is uneven; in testing it incorrectly collapsed `וְחָבִיב` (beloved) into the lemma of `אוֹהֵב` (love). Must validate before relying on it.
+   - Run `npm run roots:extract` (`scripts/extract-roots.py`) to prompt `dicta-il/dictalm-rab-7b` for a three-letter root and lemma per form. The rabbinic foundation model is a better domain fit than the modern DictaLM 1.7B/2.0 instruct models, but it is not instruction-tuned, so output must be validated on a sample before use.
+   - Risk: DictaLM lemma accuracy is uneven; in testing the 1.7B model incorrectly collapsed `וְחָבִיב` (beloved) into the lemma of `אוֹהֵב` (love). Must validate before relying on it.
 
 3. **Pronominal-suffix stripping**
    - Fold possessive and objective suffixes back to the base noun/verb: `בֵּיתִי`, `בֵּיתְךָ`, `בֵּיתוֹ` → `בַּיִת`.
