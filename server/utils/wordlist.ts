@@ -1,7 +1,7 @@
 import type { QuizWord, SectionText, TocNode } from '../../shared/types/siddur'
-import { lexiconKey } from '../../shared/utils/hebrew'
+import { consonantalKey } from '../../shared/utils/hebrew'
 import type { PrefixContext, PrefixOverrides } from '../../shared/utils/hebrew'
-import { loadLexiconTable } from './lexicon'
+import { loadLexiconTable, topLexiconEntry } from './lexicon'
 
 const SIDDUR_TITLE = 'Weekday Siddur Chabad'
 
@@ -81,7 +81,7 @@ export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
   const overrides = await loadPrefixOverrides()
   const lexicon = await loadLexiconTable()
-  const cacheKey = `sefaria:wordlist:v12:${overridesFingerprint(overrides)}`
+  const cacheKey = `sefaria:wordlist:v19:${overridesFingerprint(overrides)}`
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
@@ -92,17 +92,68 @@ export async function buildWordList(): Promise<QuizWord[]> {
   // form's lexicon headword, whether the remainder occurs on its own in the siddur, and
   // prefix.overrides.json — so בְּצֶלֶם folds into צלם, while בָּרוּךְ (ברך) and לְבָבִי (לבב) stay intact.
   const prefixCtx = await createPrefixContext(formCounts.keys(), overrides)
-  type Entry = { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string>; lemmaQuery: string | null }
+
+  /**
+   * Derive a triliteral shoresh from a consonantal string. Handles common
+   * affixes that add letters around the three root consonants:
+   * - final ה/ת (feminine/abstract noun)
+   * - internal ו/י connecting vowels
+   * - leading binyan prefixes (ה/נ/י/ת/א/מ, including hitpael תת)
+   */
+  function triliteralRoot(s: string): string | null {
+    let r = consonantalKey(s)
+    if (r.length === 3) return r
+    if (r.length === 4) {
+      if (r.endsWith('ה') || r.endsWith('ת')) {
+        r = r.slice(0, -1)
+        if (r.length === 3) return r
+      }
+      const withoutVav = r.replace(/ו/g, '')
+      if (withoutVav.length === 3) return withoutVav
+      const withoutYod = r.replace(/י/g, '')
+      if (withoutYod.length === 3) return withoutYod
+    }
+    if (r.length >= 4 && r.length <= 6) {
+      for (const pre of ['תת', 'הת', 'נת', 'ית', 'מ', 'ה', 'נ', 'י', 'ת', 'א']) {
+        if (r.startsWith(pre)) {
+          const rest = r.slice(pre.length)
+          if (rest.length === 3) return rest
+        }
+      }
+    }
+    return null
+  }
+
+  function shoreshFor(base: string): { key: string; display: string | null } {
+    const baseKey = normalizeHebrewWord(base)
+    // 1. Prefer a triliteral root derived from the Sefaria headword when available
+    // (e.g. בָּרוּךְ → ברך, חָבִיב → חבב).
+    const top = topLexiconEntry(lexicon, base)
+    if (top) {
+      const headRoot = triliteralRoot(top.headword)
+      if (headRoot) {
+        return { key: normalizeHebrewWord(headRoot), display: top.headword }
+      }
+    }
+    // 2. Derive a root from the prefix-stripped base itself. We avoid the
+    // cached model stems here: they are often wrong for particles and short
+    // forms (e.g. כִּי → עימך, חָבִיב → חיב).
+    const baseRoot = triliteralRoot(base)
+    if (baseRoot) {
+      return { key: normalizeHebrewWord(baseRoot), display: null }
+    }
+    return { key: baseKey, display: null }
+  }
+
+  type Entry = { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string>; shoreshDisplay: string | null }
   const entries = new Map<string, Entry>()
   for (const [form, n] of formCounts) {
     const analysis = classifyPrefix(form, prefixCtx)
     const base = analysis.base
-    const baseKey = normalizeHebrewWord(base)
-    const lemmaQuery = lexicon?.forms[lexiconKey(base)] || null
-    const key = lemmaQuery ? normalizeHebrewWord(lemmaQuery) : baseKey
+    const { key, display } = shoreshFor(base)
     let entry = entries.get(key)
     if (!entry) {
-      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set(), lemmaQuery }
+      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set(), shoreshDisplay: display }
       entries.set(key, entry)
     }
     entry.count += n
@@ -111,19 +162,22 @@ export async function buildWordList(): Promise<QuizWord[]> {
     if (analysis.classification === 'prefix') entry.prefixForms.add(form)
   }
 
-  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms, lemmaQuery }]) => {
+  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms, shoreshDisplay }]) => {
     const sorted = [...forms].sort((a, b) => b[1] - a[1])
-    // Prefer a surface form matching the lemma key. If none exists, strip a
-    // separable prefix from the most frequent prefixed form. As a last resort,
-    // show the lemma itself (for model/lexicon-derived groupings) or the most
-    // frequent surface form.
-    const lemmaForm = sorted.find(([f]) => normalizeHebrewWord(f) === key)
-    const prefixFallback = !lemmaForm && sorted.find(([f]) => prefixForms.has(f))
-    const word = lemmaForm
-      ? lemmaForm[0]
-      : prefixFallback
-        ? formBase.get(prefixFallback[0])!
-        : lemmaQuery || sorted[0]![0]
+    // Prefer a surface form whose consonantal key matches the shoresh. If none,
+    // prefer any unprefixed surface form so the headword is a readable Hebrew
+    // word rather than a prefixed form. As a last resort, strip a separable
+    // prefix or use a known pointed headword / the most frequent surface form.
+    const rootForm = sorted.find(([f]) => normalizeHebrewWord(f) === key)
+    const unprefixed = sorted.find(([f]) => !prefixForms.has(f))
+    const prefixFallback = sorted.find(([f]) => prefixForms.has(f))
+    const word = rootForm
+      ? rootForm[0]
+      : unprefixed
+        ? unprefixed[0]
+        : prefixFallback
+          ? formBase.get(prefixFallback[0])!
+          : shoreshDisplay || sorted[0]![0]
     return { key, word, count, forms: sorted.map(([f]) => f) }
   })
   result.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
