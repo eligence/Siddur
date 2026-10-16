@@ -10,11 +10,39 @@ const showMasteredOnly = ref(false)
 const wordsOnly = ref(false)
 // Off: hide vowelized/prefixed variant lists and show only the normalized (consonantal) key.
 const showVariants = ref(true)
+// Reduction filters: hide hapax legomena, sight particles, and Aramaic forms.
+const hideRare = ref(false)
+const hideSight = ref(false)
+const hideAramaic = ref(false)
 type SortKey = 'count' | 'alpha' | 'rank'
 type SortDir = 'asc' | 'desc'
 const DEFAULT_DIR: Record<SortKey, SortDir> = { count: 'desc', alpha: 'asc', rank: 'asc' }
 const sortBy = ref<SortKey>('count')
 const sortDir = ref<SortDir>('desc')
+
+const FILTER_STORAGE_KEY = 'siddur:word-filters-v1'
+if (import.meta.client) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? '{}')
+    if (typeof saved.hideRare === 'boolean') hideRare.value = saved.hideRare
+    if (typeof saved.hideSight === 'boolean') hideSight.value = saved.hideSight
+    if (typeof saved.hideAramaic === 'boolean') hideAramaic.value = saved.hideAramaic
+  }
+  catch { /* ignore corrupt storage */ }
+  watch(
+    [hideRare, hideSight, hideAramaic],
+    () => {
+      try {
+        localStorage.setItem(
+          FILTER_STORAGE_KEY,
+          JSON.stringify({ hideRare: hideRare.value, hideSight: hideSight.value, hideAramaic: hideAramaic.value }),
+        )
+      }
+      catch { /* ignore quota errors */ }
+    },
+    { deep: true },
+  )
+}
 
 // Clicking the active header flips direction; clicking another uses its default.
 function setSort(key: SortKey) {
@@ -54,9 +82,14 @@ const sorted = computed(() => {
           .map(({ w }) => w)
   return sortDir.value === DEFAULT_DIR[sortBy.value] ? list : [...list].reverse()
 })
-const visible = computed(() =>
-  showMasteredOnly.value && !wordsOnly.value ? sorted.value.filter((w) => isMastered(w.key)) : sorted.value,
-)
+const visible = computed(() => {
+  let list = sorted.value
+  if (showMasteredOnly.value && !wordsOnly.value) list = list.filter((w) => isMastered(w.key))
+  if (hideRare.value) list = list.filter((w) => !w.tags?.includes('rare'))
+  if (hideSight.value) list = list.filter((w) => !w.tags?.includes('sight'))
+  if (hideAramaic.value) list = list.filter((w) => !w.tags?.includes('aramaic'))
+  return list
+})
 
 // When sorted by Word, rows are grouped into collapsible sections by first letter.
 // Otherwise a single untitled, always-open group holds every row.
@@ -117,6 +150,9 @@ function letterStyle(letter: string) {
               <USwitch v-if="!wordsOnly" v-model="showMasteredOnly" label="Show mastered only" />
               <USwitch v-model="showVariants" label="Show variants" />
               <USwitch v-model="wordsOnly" label="Words only" />
+              <USwitch v-model="hideRare" label="Hide rare" />
+              <USwitch v-model="hideSight" label="Hide sight words" />
+              <USwitch v-model="hideAramaic" label="Hide Aramaic" />
             </div>
           </div>
 
@@ -192,6 +228,9 @@ function letterStyle(letter: string) {
                   <span class="list-word">{{ showVariants ? w.word : w.key }}</span>
                   <span v-if="showVariants && w.forms.length > 1" class="list-forms block text-neutral-400">
                     {{ w.forms.filter((f) => f !== w.word).join(' · ') }}
+                  </span>
+                  <span v-if="!wordsOnly && w.tags?.length" class="block text-xs text-neutral-400">
+                    {{ w.tags.join(' · ') }}
                   </span>
                 </td>
               </tr>

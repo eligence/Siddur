@@ -125,7 +125,7 @@ When the user answers a quiz word **correctly**, that answer is added to the wor
 
 ### Build steps
 1. `shared/utils/hebrew.ts` — `normalizeHebrewWord()` (consonantal key, shared with word-progress variations) and `cleanHebrewWord()` (edge-punctuation strip for lexicon lookups), used by both client and server.
-2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Separable prefixes are stripped from the displayed headword. Forms are then grouped by triliteral shoresh when it can be derived from the Sefaria headword or the prefix-stripped base; otherwise they stay under their base key. Cached as `sefaria:wordlist:v19`.
+2. `server/utils/wordlist.ts` + `server/api/siddur/words.get.ts` — fetches every section, counts words by normalized key (notes excluded), sorts by count desc. Separable prefixes are stripped from the displayed headword. Forms are then grouped by triliteral shoresh when it can be derived from the Sefaria headword or the prefix-stripped base; otherwise they stay under their base key. Each `QuizWord` is also tagged as `rare` (hapax), `sight` (common function word), or `aramaic` for filtering. Cached as `sefaria:wordlist:v20`.
    - **Hebrew only**: tokens whose key isn't purely Hebrew letters (e.g. Omer day numbers `1`–`49`) are skipped. Forms are NFC-normalized and `normalizeHebrewWord()` applies NFKD, so vowelization variants collapse to one key. Maqaf-joined tokens (the table keys are split parts) resolve by combining each part's entries.
    - **Maqaf (`־`)**: maqaf-joined tokens (e.g. `עַל֯־פְּנֵי`) are split and each word counted separately. The siddur display keeps them as one token.
    - **Prefix folding (Otiyot HaShimush)**: `hebrewPrefixStems()` in `shared/utils/hebrew.ts` peels formative prefixes in order `ו` → `ב/כ/ל` or `מ` → `ה`, using the pointing rules (e.g. `מִ` + dagesh / `מֵ` before gutturals; `הַ` + dagesh / `הָ` / `הֶ` (only before a qamats/hataf-qamats `ה/ח/ע`, so hif'il `הֶחֱ` stays intact); `בַּ/לָ` with an absorbed article). A leading `ו` is **always** stripped as "and", with no standalone check. For `ב/כ/ל/מ/ה`, a form is folded into the deepest stem whose key **also occurs standalone** in the siddur — this guards root letters (`בָּרוּךְ` stays intact since `רוך` never appears alone).
@@ -156,7 +156,17 @@ Result: the list drops from **4,618** unique forms to ~**2,780**. Major verb fam
 Caveats:
 - Pronominal/objective suffixes are not stripped, so suffixed forms like `דְּבָרְךָ`, `יְחָבְרְךָ`, and `עַמְּךָ` may get their own key rather than joining their root.
 - Weak roots and nouns with internal root letters (e.g., roots containing ו/י) can be mis-identified.
-- Proper nouns (יְיָ, יִשְׂרָאֵל) and Aramaic forms are not unified.
+- Proper nouns (יְיָ, יִשְׂרָאֵל) and Aramaic forms are not unified by the root grouping.
+
+### Implemented — Word-list reduction filters
+
+Every `QuizWord` now carries `tags` computed in `server/utils/wordlist.ts` and used by both `/words` and `/quiz`:
+
+- **`rare`** — `count === 1` (hapax legomena). Toggling "Hide rare" removes these from the list/quiz. Currently ~1,040 of ~2,780 entries.
+- **`sight`** — A curated set of high-frequency function particles/pronouns (`את`, `על`, `לא`, `כי`, `ש`, the single-letter prefixes/conjunctions, common pronouns, etc.). ~49 entries.
+- **`aramaic`** — Conservative heuristic: forms that Sefaria did not match (`server/assets/lexicon.unmatched.txt`) and whose key ends with typical Aramaic inflections (`ין`, `הון`, `תא`). ~23 entries. False positives/negatives are possible; this is a starting proxy, not a full language classifier.
+
+The toggles in `/words` hide rows in real time; the same toggles in `/quiz` filter the session queue on restart. Filter state is persisted in `localStorage` under `siddur:word-filters-v1` so the two pages share the same choices.
 
 ### Future strategies
 

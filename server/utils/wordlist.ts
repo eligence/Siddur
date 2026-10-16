@@ -2,8 +2,56 @@ import type { QuizWord, SectionText, TocNode } from '../../shared/types/siddur'
 import { consonantalKey } from '../../shared/utils/hebrew'
 import type { PrefixContext, PrefixOverrides } from '../../shared/utils/hebrew'
 import { loadLexiconTable, topLexiconEntry } from './lexicon'
+import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
 const SIDDUR_TITLE = 'Weekday Siddur Chabad'
+
+/** Function words and very common pronouns/particles that a learner typically
+ *  recognizes as sight words before studying them as vocabulary. */
+const SIGHT_WORD_KEYS = new Set([
+  // single-letter prefixes / conjunctions
+  'א', 'ב', 'כ', 'ל', 'מ', 'ה', 'ו', 'ש',
+  // pronouns
+  'את', 'אתה', 'אתם', 'אתן', 'אני', 'הוא', 'היא', 'הם', 'הן', 'אלה', 'אלו',
+  'זה', 'זו', 'זאת',
+  // prepositions / particles / adverbs
+  'לא', 'לו', 'לי', 'לך', 'לה', 'לנו', 'לכם', 'לכן',
+  'כי', 'אם', 'אשר', 'של', 'על', 'עם', 'עד', 'מן', 'מה', 'מי', 'גם', 'רק', 'כן', 'נא', 'די',
+  'בו', 'בה', 'בך', 'בם', 'כם', 'נו', 'כל', 'כול', 'אין', 'יש', 'היה', 'היו',
+])
+
+let unmatchedCache: { keys: Set<string>; fingerprint: string } | null = null
+
+/** Load the forms that Sefaria did not match to a Hebrew lexicon. These are a
+ *  useful proxy for Aramaic and other non-Hebrew material in the siddur. */
+async function loadUnmatchedKeys(): Promise<{ keys: Set<string>; fingerprint: string }> {
+  if (unmatchedCache) return unmatchedCache
+  const file = resolve(process.cwd(), 'server/assets/lexicon.unmatched.txt')
+  let raw = ''
+  try {
+    raw = await readFile(file, 'utf8')
+  }
+  catch { /* optional asset */ }
+  const fingerprint = createHash('sha256').update(raw).digest('hex').slice(0, 8)
+  const keys = new Set<string>()
+  for (const line of raw.split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    const form = parts[1]
+    if (form) keys.add(normalizeHebrewWord(form))
+  }
+  unmatchedCache = { keys, fingerprint }
+  return unmatchedCache
+}
+
+function classifyTags(key: string, count: number, isUnmatched: boolean): string[] {
+  const tags: string[] = []
+  if (count === 1) tags.push('rare')
+  if (SIGHT_WORD_KEYS.has(key)) tags.push('sight')
+  if (isUnmatched && /(ין|הון|תא)$/.test(key)) tags.push('aramaic')
+  return tags
+}
 
 export interface SiddurLeaf {
   /** Top-level TOC node (one /siddur/<slug> page). */
@@ -81,7 +129,8 @@ export async function buildWordList(): Promise<QuizWord[]> {
   const storage = useStorage('cache')
   const overrides = await loadPrefixOverrides()
   const lexicon = await loadLexiconTable()
-  const cacheKey = `sefaria:wordlist:v19:${overridesFingerprint(overrides)}`
+  const { keys: unmatchedKeys, fingerprint: unmatchedFingerprint } = await loadUnmatchedKeys()
+  const cacheKey = `sefaria:wordlist:v20:${overridesFingerprint(overrides)}:${unmatchedFingerprint}`
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
@@ -178,7 +227,8 @@ export async function buildWordList(): Promise<QuizWord[]> {
         : prefixFallback
           ? formBase.get(prefixFallback[0])!
           : shoreshDisplay || sorted[0]![0]
-    return { key, word, count, forms: sorted.map(([f]) => f) }
+    const tags = classifyTags(key, count, unmatchedKeys.has(key))
+    return { key, word, count, forms: sorted.map(([f]) => f), tags }
   })
   result.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
 

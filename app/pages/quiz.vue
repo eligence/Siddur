@@ -16,6 +16,34 @@ const isCorrect = ref(false)
 const session = reactive({ correct: 0, incorrect: 0 })
 const inputEl = ref<HTMLInputElement | null>(null)
 
+// Shared with /words: hide hapax legomena, sight particles, and Aramaic forms.
+const hideRare = ref(false)
+const hideSight = ref(false)
+const hideAramaic = ref(false)
+const FILTER_STORAGE_KEY = 'siddur:word-filters-v1'
+if (import.meta.client) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? '{}')
+    if (typeof saved.hideRare === 'boolean') hideRare.value = saved.hideRare
+    if (typeof saved.hideSight === 'boolean') hideSight.value = saved.hideSight
+    if (typeof saved.hideAramaic === 'boolean') hideAramaic.value = saved.hideAramaic
+  }
+  catch { /* ignore corrupt storage */ }
+  watch(
+    [hideRare, hideSight, hideAramaic],
+    () => {
+      try {
+        localStorage.setItem(
+          FILTER_STORAGE_KEY,
+          JSON.stringify({ hideRare: hideRare.value, hideSight: hideSight.value, hideAramaic: hideAramaic.value }),
+        )
+      }
+      catch { /* ignore quota errors */ }
+    },
+    { deep: true },
+  )
+}
+
 const current = computed(() => queue.value[position.value] ?? null)
 const lookupState = computed(() => (current.value ? stateFor(current.value.word) : undefined))
 const rankOf = computed(() => {
@@ -27,7 +55,11 @@ const masteredCount = computed(() => words.value?.filter((w) => isMastered(w.key
 const currentProgress = computed(() => (current.value ? progress.value[current.value.key] : undefined))
 
 function startSession() {
-  queue.value = (words.value ?? []).filter((w) => !isMastered(w.key))
+  let list = (words.value ?? []).filter((w) => !isMastered(w.key))
+  if (hideRare.value) list = list.filter((w) => !w.tags?.includes('rare'))
+  if (hideSight.value) list = list.filter((w) => !w.tags?.includes('sight'))
+  if (hideAramaic.value) list = list.filter((w) => !w.tags?.includes('aramaic'))
+  queue.value = list
   position.value = 0
   session.correct = 0
   session.incorrect = 0
@@ -110,6 +142,12 @@ function onEnter() {
             <UBadge color="neutral" variant="subtle">Mastered {{ masteredCount }} / {{ words.length }}</UBadge>
             <UBadge color="success" variant="subtle">Correct {{ session.correct }}</UBadge>
             <UBadge color="error" variant="subtle">Incorrect {{ session.incorrect }}</UBadge>
+          </div>
+
+          <div class="flex flex-wrap justify-center gap-4 text-sm">
+            <USwitch v-model="hideRare" label="Hide rare" />
+            <USwitch v-model="hideSight" label="Hide sight words" />
+            <USwitch v-model="hideAramaic" label="Hide Aramaic" />
           </div>
 
           <div v-if="!current" class="rounded-lg border border-neutral-200 bg-white p-8 text-center">

@@ -43,6 +43,8 @@ export interface QuizWord {
   count: number
   /** Every vowelized form (incl. prefixed) folded into this entry, most frequent first. */
   forms: string[]
+  /** Classification tags used by the word-list and quiz filters. */
+  tags?: string[]
 }
 
 export interface PrefixLocation {
