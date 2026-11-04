@@ -17,7 +17,7 @@ const session = reactive({ correct: 0, incorrect: 0 })
 const inputEl = ref<HTMLInputElement | null>(null)
 
 // Reduction filters, shared with /words and persisted to localStorage.
-const { hideRare, hideSight, hideAramaic, minCount, minCountItems } = useWordFilters()
+const { hideRare, hideSight, hideAramaic, minCount, minCountItems, place, places, placeItems, matchesPlace } = useWordFilters()
 
 const current = computed(() => queue.value[position.value] ?? null)
 const lookupState = computed(() => (current.value ? stateFor(current.value.word) : undefined))
@@ -29,12 +29,40 @@ const rankOf = computed(() => {
 const masteredCount = computed(() => words.value?.filter((w) => isMastered(w.key)).length ?? 0)
 const currentProgress = computed(() => (current.value ? progress.value[current.value.key] : undefined))
 
+// The leaf section with the highest share of mastered words (>=10 unique words,
+// not yet fully mastered). Clicking applies it as the place filter.
+const suggested = computed(() => {
+  const bySection = new Map<string, { total: Set<string>; mastered: Set<string> }>()
+  for (const w of words.value ?? []) {
+    for (const loc of w.locs ?? []) {
+      const ref = loc.split('#')[0]!
+      let s = bySection.get(ref)
+      if (!s) {
+        s = { total: new Set(), mastered: new Set() }
+        bySection.set(ref, s)
+      }
+      s.total.add(w.key)
+      if (isMastered(w.key)) s.mastered.add(w.key)
+    }
+  }
+  let best: { ref: string; percent: number } | null = null
+  for (const [ref, s] of bySection) {
+    if (s.total.size < 10 || s.mastered.size === s.total.size) continue
+    const percent = s.mastered.size / s.total.size
+    if (!best || percent > best.percent) best = { ref, percent }
+  }
+  if (!best) return null
+  const label = places.value?.find((p) => p.kind === 'section' && p.value === best!.ref)?.label ?? best.ref
+  return { ref: best.ref, label, percent: Math.round(best.percent * 100) }
+})
+
 function startSession() {
   let list = (words.value ?? []).filter((w) => !isMastered(w.key))
   if (minCount.value > 1) list = list.filter((w) => w.count >= minCount.value)
   if (hideRare.value) list = list.filter((w) => !w.tags?.includes('rare'))
   if (hideSight.value) list = list.filter((w) => !w.tags?.includes('sight'))
   if (hideAramaic.value) list = list.filter((w) => !w.tags?.includes('aramaic'))
+  if (place.value) list = list.filter(matchesPlace)
   queue.value = list
   position.value = 0
   session.correct = 0
@@ -55,7 +83,7 @@ watch(words, (list) => {
 }, { immediate: true })
 
 // Rebuild the queue when a filter changes so the session matches the word list.
-watch([hideRare, hideSight, hideAramaic, minCount], () => {
+watch([hideRare, hideSight, hideAramaic, minCount, place], () => {
   if (words.value?.length) startSession()
 })
 
@@ -125,8 +153,21 @@ function onEnter() {
             <UBadge color="error" variant="subtle">Incorrect {{ session.incorrect }}</UBadge>
           </div>
 
+          <div v-if="suggested" class="flex justify-center text-sm">
+            <UButton
+              color="neutral"
+              variant="subtle"
+              size="sm"
+              icon="i-lucide-compass"
+              @click="place = suggested.ref"
+            >
+              Suggested next: {{ suggested.label }} — {{ suggested.percent }}% mastered
+            </UButton>
+          </div>
+
           <div class="flex flex-wrap justify-center gap-4 text-sm">
             <USelect v-model="minCount" :items="minCountItems" label="Min count" class="w-32" />
+            <USelectMenu v-model="place" :items="placeItems" placeholder="Section / paragraph" class="w-64" />
             <USwitch v-model="hideRare" label="Hide rare" />
             <USwitch v-model="hideSight" label="Hide sight words" />
             <USwitch v-model="hideAramaic" label="Hide Aramaic" />

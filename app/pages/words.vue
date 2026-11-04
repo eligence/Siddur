@@ -11,7 +11,7 @@ const wordsOnly = ref(false)
 // Off: hide vowelized/prefixed variant lists and show only the normalized (consonantal) key.
 const showVariants = ref(true)
 // Reduction filters, shared with /quiz and persisted to localStorage.
-const { hideRare, hideSight, hideAramaic, minCount, minCountItems } = useWordFilters()
+const { hideRare, hideSight, hideAramaic, minCount, minCountItems, place, placeItems, matchesPlace } = useWordFilters()
 type SortKey = 'count' | 'alpha' | 'rank'
 type SortDir = 'asc' | 'desc'
 const DEFAULT_DIR: Record<SortKey, SortDir> = { count: 'desc', alpha: 'asc', rank: 'asc' }
@@ -63,6 +63,7 @@ const visible = computed(() => {
   if (hideRare.value) list = list.filter((w) => !w.tags?.includes('rare'))
   if (hideSight.value) list = list.filter((w) => !w.tags?.includes('sight'))
   if (hideAramaic.value) list = list.filter((w) => !w.tags?.includes('aramaic'))
+  if (place.value) list = list.filter(matchesPlace)
   return list
 })
 
@@ -126,6 +127,7 @@ function letterStyle(letter: string) {
               <USwitch v-model="showVariants" label="Show variants" />
               <USwitch v-model="wordsOnly" label="Words only" />
               <USelect v-model="minCount" :items="minCountItems" label="Min count" class="w-32" />
+              <USelectMenu v-model="place" :items="placeItems" placeholder="Section / paragraph" class="w-64" />
               <USwitch v-model="hideRare" label="Hide rare" />
               <USwitch v-model="hideSight" label="Hide sight words" />
               <USwitch v-model="hideAramaic" label="Hide Aramaic" />

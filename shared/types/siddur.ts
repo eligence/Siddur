@@ -45,6 +45,17 @@ export interface QuizWord {
   forms: string[]
   /** Classification tags used by the word-list and quiz filters. */
   tags?: string[]
+  /** Locations where this word's forms occur: "ref#para" (1-based paragraph). */
+  locs?: string[]
+}
+
+/** A selectable siddur location for the word-list/quiz place filter. */
+export interface WordPlace {
+  /** Leaf section ref, or "ref#para" (1-based) for a paragraph. */
+  value: string
+  /** TOC title for sections; paragraph number + first word for paragraphs. */
+  label: string
+  kind: 'section' | 'para'
 }
 
 export interface PrefixLocation {

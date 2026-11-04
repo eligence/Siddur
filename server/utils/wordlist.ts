@@ -1,4 +1,4 @@
-import type { QuizWord, SectionText, TocNode } from '../../shared/types/siddur'
+import type { QuizWord, SectionText, TocNode, WordPlace } from '../../shared/types/siddur'
 import { consonantalKey } from '../../shared/utils/hebrew'
 import type { PrefixContext, PrefixOverrides } from '../../shared/utils/hebrew'
 import { loadLexiconTable, topLexiconEntry } from './lexicon'
@@ -130,12 +130,29 @@ export async function buildWordList(): Promise<QuizWord[]> {
   const overrides = await loadPrefixOverrides()
   const lexicon = await loadLexiconTable()
   const { keys: unmatchedKeys, fingerprint: unmatchedFingerprint } = await loadUnmatchedKeys()
-  const cacheKey = `sefaria:wordlist:v20:${overridesFingerprint(overrides)}:${unmatchedFingerprint}`
+  const cacheKey = `sefaria:wordlist:v21:${overridesFingerprint(overrides)}:${unmatchedFingerprint}`
   const cached = await storage.getItem<QuizWord[]>(cacheKey)
   if (cached) return cached
 
-  const { texts, failed } = await loadSiddurTexts()
+  const { leaves, texts, failed } = await loadSiddurTexts()
   const formCounts = countForms(texts.values())
+  // Track every "ref#para" location per form so words can be filtered by place.
+  const formLocs = new Map<string, Set<string>>()
+  for (const { ref } of leaves) {
+    const text = texts.get(ref)
+    if (!text) continue
+    text.paragraphs.forEach((para, pi) => {
+      const loc = `${ref}#${pi + 1}`
+      for (const seg of para.segments) {
+        if (seg.type !== 'words') continue
+        for (const form of seg.words.flatMap(tokenForms)) {
+          const set = formLocs.get(form) ?? new Set<string>()
+          set.add(loc)
+          formLocs.set(form, set)
+        }
+      }
+    })
+  }
 
   // Prefixes (ו/שֶׁ/ב/כ/ל/מ/ה) are stripped per classifyPrefix — pointing, the
   // form's lexicon headword, whether the remainder occurs on its own in the siddur, and
@@ -194,7 +211,7 @@ export async function buildWordList(): Promise<QuizWord[]> {
     return { key: baseKey, display: null }
   }
 
-  type Entry = { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string>; shoreshDisplay: string | null }
+  type Entry = { count: number; forms: Map<string, number>; formBase: Map<string, string>; prefixForms: Set<string>; shoreshDisplay: string | null; locs: Set<string> }
   const entries = new Map<string, Entry>()
   for (const [form, n] of formCounts) {
     const analysis = classifyPrefix(form, prefixCtx)
@@ -202,16 +219,17 @@ export async function buildWordList(): Promise<QuizWord[]> {
     const { key, display } = shoreshFor(base)
     let entry = entries.get(key)
     if (!entry) {
-      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set(), shoreshDisplay: display }
+      entry = { count: 0, forms: new Map(), formBase: new Map(), prefixForms: new Set(), shoreshDisplay: display, locs: new Set() }
       entries.set(key, entry)
     }
     entry.count += n
     entry.forms.set(form, n)
     entry.formBase.set(form, base)
+    for (const loc of formLocs.get(form) ?? []) entry.locs.add(loc)
     if (analysis.classification === 'prefix') entry.prefixForms.add(form)
   }
 
-  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms, shoreshDisplay }]) => {
+  const result: QuizWord[] = [...entries].map(([key, { count, forms, formBase, prefixForms, shoreshDisplay, locs }]) => {
     const sorted = [...forms].sort((a, b) => b[1] - a[1])
     // Prefer a surface form whose consonantal key matches the shoresh. If none,
     // prefer any unprefixed surface form so the headword is a readable Hebrew
@@ -228,10 +246,34 @@ export async function buildWordList(): Promise<QuizWord[]> {
           ? formBase.get(prefixFallback[0])!
           : shoreshDisplay || sorted[0]![0]
     const tags = classifyTags(key, count, unmatchedKeys.has(key))
-    return { key, word, count, forms: sorted.map(([f]) => f), tags }
+    return { key, word, count, forms: sorted.map(([f]) => f), tags, locs: [...locs] }
   })
   result.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
 
   if (!failed) await storage.setItem(cacheKey, result)
   return result
+}
+
+/** Selectable places for the word-list/quiz filter: every leaf section plus
+ *  each paragraph, labeled "¶N <first word>". */
+export async function buildWordPlaces(): Promise<WordPlace[]> {
+  const storage = useStorage('cache')
+  const cacheKey = 'sefaria:wordplaces:v1'
+  const cached = await storage.getItem<WordPlace[]>(cacheKey)
+  if (cached) return cached
+  const { leaves, texts, failed } = await loadSiddurTexts()
+  const places: WordPlace[] = []
+  for (const { top, leaf, ref } of leaves) {
+    places.push({ value: ref, label: `${top.title} · ${leaf.title}`, kind: 'section' })
+    const text = texts.get(ref)
+    if (!text) continue
+    text.paragraphs.forEach((para, i) => {
+      const first = para.segments.find((s) => s.type === 'words')
+      const word = first?.type === 'words' ? first.words[0] : null
+      if (!word) return
+      places.push({ value: `${ref}#${i + 1}`, label: `${leaf.title} ¶${i + 1} · ${word}`, kind: 'para' })
+    })
+  }
+  if (!failed) await storage.setItem(cacheKey, places)
+  return places
 }
