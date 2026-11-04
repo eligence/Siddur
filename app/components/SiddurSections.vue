@@ -227,8 +227,8 @@ onBeforeUnmount(() => {
     <section
       v-for="leaf in leaves"
       :id="sectionElementId(leaf.ref!)"
-      :data-ref="leaf.ref"
       :key="leaf.ref"
+      :data-ref="leaf.ref"
       class="prayer-section"
       :class="{ pending: !sections[leaf.ref!] && !errors[leaf.ref!] }"
     >
@@ -299,8 +299,8 @@ onBeforeUnmount(() => {
                 <template v-else-if="seg.type === 'words'">
                   <HebrewWord
                     v-for="(word, wi) in seg.words"
-                    :key="wi"
                     :id="wordId(leaf.ref!, i, si, wi)"
+                    :key="wi"
                     :word="word"
                     :show-input="showInputs"
                     :show-value="showEnglish"

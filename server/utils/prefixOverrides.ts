@@ -49,7 +49,10 @@ async function writePrefixOverrides(overrides: PrefixOverrides): Promise<PrefixO
 export async function savePrefixOverride(word: string, classification: PrefixClass | null): Promise<PrefixOverrides> {
   const overrides = await loadPrefixOverrides()
   if (classification) overrides[word] = classification
-  else delete overrides[word]
+  else {
+    const { [word]: _cleared, ...rest } = overrides
+    return writePrefixOverrides(rest)
+  }
   return writePrefixOverrides(overrides)
 }
 

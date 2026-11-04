@@ -16,49 +16,8 @@ const isCorrect = ref(false)
 const session = reactive({ correct: 0, incorrect: 0 })
 const inputEl = ref<HTMLInputElement | null>(null)
 
-// Shared with /words: hide hapax legomena, sight particles, and Aramaic forms.
-const hideRare = ref(false)
-const hideSight = ref(false)
-const hideAramaic = ref(false)
-// Hide words that occur fewer than this many times.
-const minCount = ref(1)
-const minCountItems = [
-  { label: 'All counts', value: 1 },
-  { label: '≥2', value: 2 },
-  { label: '≥3', value: 3 },
-  { label: '≥4', value: 4 },
-  { label: '≥5', value: 5 },
-  { label: '≥10', value: 10 },
-]
-const FILTER_STORAGE_KEY = 'siddur:word-filters-v1'
-if (import.meta.client) {
-  try {
-    const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? '{}')
-    if (typeof saved.hideRare === 'boolean') hideRare.value = saved.hideRare
-    if (typeof saved.hideSight === 'boolean') hideSight.value = saved.hideSight
-    if (typeof saved.hideAramaic === 'boolean') hideAramaic.value = saved.hideAramaic
-    if (typeof saved.minCount === 'number') minCount.value = saved.minCount
-  }
-  catch { /* ignore corrupt storage */ }
-  watch(
-    [hideRare, hideSight, hideAramaic, minCount],
-    () => {
-      try {
-        localStorage.setItem(
-          FILTER_STORAGE_KEY,
-          JSON.stringify({
-            hideRare: hideRare.value,
-            hideSight: hideSight.value,
-            hideAramaic: hideAramaic.value,
-            minCount: minCount.value,
-          }),
-        )
-      }
-      catch { /* ignore quota errors */ }
-    },
-    { deep: true },
-  )
-}
+// Reduction filters, shared with /words and persisted to localStorage.
+const { hideRare, hideSight, hideAramaic, minCount, minCountItems } = useWordFilters()
 
 const current = computed(() => queue.value[position.value] ?? null)
 const lookupState = computed(() => (current.value ? stateFor(current.value.word) : undefined))
@@ -94,6 +53,11 @@ function resetCard() {
 watch(words, (list) => {
   if (list?.length) startSession()
 }, { immediate: true })
+
+// Rebuild the queue when a filter changes so the session matches the word list.
+watch([hideRare, hideSight, hideAramaic, minCount], () => {
+  if (words.value?.length) startSession()
+})
 
 async function check() {
   const word = current.value
@@ -195,7 +159,7 @@ function onEnter() {
               :class="phase === 'revealed' ? (isCorrect ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50') : ''"
               aria-label="English translation"
               @keydown.enter.prevent="onEnter"
-            />
+            >
 
             <div v-if="phase === 'answering'" class="flex justify-center gap-2">
               <UButton color="neutral" variant="ghost" @click="next">Skip</UButton>

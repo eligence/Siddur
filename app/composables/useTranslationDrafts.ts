@@ -43,11 +43,15 @@ export function useTranslationDrafts() {
   function setDraft(ref: string, paraIndex: number, value: string) {
     const key = draftKey(ref, paraIndex)
     if (value.trim()) drafts.value[key] = value
-    else delete drafts.value[key]
+    else {
+      const { [key]: _cleared, ...rest } = drafts.value
+      drafts.value = rest
+    }
   }
 
   function clearDraft(ref: string, paraIndex: number) {
-    delete drafts.value[draftKey(ref, paraIndex)]
+    const { [draftKey(ref, paraIndex)]: _cleared, ...rest } = drafts.value
+    drafts.value = rest
   }
 
   function hasDraft(ref: string, paraIndex: number): boolean {

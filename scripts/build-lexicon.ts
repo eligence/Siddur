@@ -36,8 +36,6 @@ try {
 }
 const memo = new Map<string, Promise<LexiconResult[]>>()
 let pendingWrites = 0
-let savedCount = Object.keys(persisted).length
-const inflight = { done: 0, queries: savedCount }
 
 function flushCache() {
   mkdirSync(resolve('.cache'), { recursive: true })

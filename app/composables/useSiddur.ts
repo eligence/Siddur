@@ -17,7 +17,8 @@ export function useSiddurSections() {
   async function loadSection(ref: string) {
     if (sections.value[ref] || loading.value[ref]) return
     loading.value[ref] = true
-    delete errors.value[ref]
+    const { [ref]: _cleared, ...rest } = errors.value
+    errors.value = rest
     try {
       const data = await $fetch<SectionText>('/api/siddur/text', { query: { ref } })
       sections.value[ref] = data

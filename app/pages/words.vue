@@ -10,55 +10,13 @@ const showMasteredOnly = ref(false)
 const wordsOnly = ref(false)
 // Off: hide vowelized/prefixed variant lists and show only the normalized (consonantal) key.
 const showVariants = ref(true)
-// Reduction filters: hide hapax legomena, sight particles, and Aramaic forms.
-const hideRare = ref(false)
-const hideSight = ref(false)
-const hideAramaic = ref(false)
-// Hide words that occur fewer than this many times.
-const minCount = ref(1)
-const minCountItems = [
-  { label: 'All counts', value: 1 },
-  { label: '≥2', value: 2 },
-  { label: '≥3', value: 3 },
-  { label: '≥4', value: 4 },
-  { label: '≥5', value: 5 },
-  { label: '≥10', value: 10 },
-]
+// Reduction filters, shared with /quiz and persisted to localStorage.
+const { hideRare, hideSight, hideAramaic, minCount, minCountItems } = useWordFilters()
 type SortKey = 'count' | 'alpha' | 'rank'
 type SortDir = 'asc' | 'desc'
 const DEFAULT_DIR: Record<SortKey, SortDir> = { count: 'desc', alpha: 'asc', rank: 'asc' }
 const sortBy = ref<SortKey>('count')
 const sortDir = ref<SortDir>('desc')
-
-const FILTER_STORAGE_KEY = 'siddur:word-filters-v1'
-if (import.meta.client) {
-  try {
-    const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? '{}')
-    if (typeof saved.hideRare === 'boolean') hideRare.value = saved.hideRare
-    if (typeof saved.hideSight === 'boolean') hideSight.value = saved.hideSight
-    if (typeof saved.hideAramaic === 'boolean') hideAramaic.value = saved.hideAramaic
-    if (typeof saved.minCount === 'number') minCount.value = saved.minCount
-  }
-  catch { /* ignore corrupt storage */ }
-  watch(
-    [hideRare, hideSight, hideAramaic, minCount],
-    () => {
-      try {
-        localStorage.setItem(
-          FILTER_STORAGE_KEY,
-          JSON.stringify({
-            hideRare: hideRare.value,
-            hideSight: hideSight.value,
-            hideAramaic: hideAramaic.value,
-            minCount: minCount.value,
-          }),
-        )
-      }
-      catch { /* ignore quota errors */ }
-    },
-    { deep: true },
-  )
-}
 
 // Clicking the active header flips direction; clicking another uses its default.
 function setSort(key: SortKey) {

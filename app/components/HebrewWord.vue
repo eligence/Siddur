@@ -113,7 +113,7 @@ function onInputTab(e: KeyboardEvent) {
       :aria-label="`English translation guess for ${word}`"
       @keydown.tab.prevent="onInputTab"
       @blur="onInputBlur"
-    />
+    >
     <div v-else ref="dropdownRef" class="variation-dropdown">
       <button
         type="button"
@@ -150,7 +150,7 @@ function onInputTab(e: KeyboardEvent) {
             autocomplete="off"
             spellcheck="false"
             @keydown.enter.prevent="submitNewValue"
-          />
+          >
           <button type="button" class="variation-add" @click="submitNewValue">+</button>
         </div>
       </div>

@@ -277,7 +277,7 @@ function exportDrafts() {
                         @pointermove="onSizePointerMove"
                         @pointerup="onSizePointerUp"
                         @pointercancel="onSizePointerCancel"
-                      />
+                      >
                       <UButton
                         icon="i-lucide-plus"
                         size="xs"
@@ -299,7 +299,7 @@ function exportDrafts() {
                           class="style-color-input"
                           :value="textStyles[t.key].color || '#000000'"
                           @input="textStyles[t.key].color = ($event.target as HTMLInputElement).value"
-                        />
+                        >
                       </label>
                     </div>
                   </section>
